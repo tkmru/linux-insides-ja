@@ -1,20 +1,25 @@
 Kernel booting process. Part 1.
 ================================================================================
 
-From the bootloader to the kernel
+bootloaderからkernelまで
 --------------------------------------------------------------------------------
 
-If you have been reading my previous [blog posts](http://0xax.blogspot.com/search/label/asm), then you can see that, for some time, I have been starting to get involved in low-level programming. I have written some posts about x86_64 assembly programming for Linux and, at the same time, I have also started to dive into the Linux source code. I have a great interest in understanding how low-level things work, how programs run on my computer, how are they located in memory, how the kernel manages processes & memory, how the network stack works at a low level, and many many other things. So, I have decided to write yet another series of posts about the Linux kernel for **x86_64**.
 
-Note that I'm not a professional kernel hacker and I don't write code for the kernel at work. It's just a hobby. I just like low-level stuff, and it is interesting for me to see how these things work. So if you notice anything confusing, or if you have any questions/remarks, ping me on twitter [0xAX](https://twitter.com/0xAX), drop me an [email](anotherworldofworld@gmail.com) or just create an [issue](https://github.com/0xAX/linux-insides/issues/new). I appreciate it. All posts will also be accessible at [linux-insides](https://github.com/0xAX/linux-insides) and, if you find something wrong with my English or the post content, feel free to send a pull request.
+もし私のブログの[記事](http://0xax.blogspot.com/search/label/asm)を読まれた方はご存じかと思いますが、ちょっと前からレイヤーが低レベルのプログラミングを行っています。
+Linux用x86_64アセンブリによるプログラミングについて記事を書いていて、Linuxのソースコードにも触れるようになりました。
+ローレイヤーがどのように機能しているのか、コンピュータでプログラムがどのように実行されるのか、どのようにメモリに配置されるのか、kernelがどのようにプロセスとメモリを扱うのか、ローレイヤーでネットワークスタックがどのように動くのか等、多くのことを理解しようととても興味が湧いています。
+それで、**x86_64** のLinux kernelについてのシリーズを書こうと決心しました。
+
+Note that I'm not a professional kernel hacker and I don't write code for the kernel at work.
+It's just a hobby. I just like low-level stuff, and it is interesting for me to see how these things work. So if you notice anything confusing, or if you have any questions/remarks, ping me on twitter [0xAX](https://twitter.com/0xAX), drop me an [email](anotherworldofworld@gmail.com) or just create an [issue](https://github.com/0xAX/linux-insides/issues/new). I appreciate it. All posts will also be accessible at [linux-insides](https://github.com/0xAX/linux-insides) and, if you find something wrong with my English or the post content, feel free to send a pull request.
 
 
-*Note that this isn't official documentation, just learning and sharing knowledge.*
+*これは正式なドキュメントではありません。あくま学習のためや知識共有のためのものですのでご注意ください。*
 
-**Required knowledge**
+**必要な知識**
 
-* Understanding C code
-* Understanding assembly code (AT&T syntax)
+* Cコードの理解
+* アセンブリ(AT&T記法)の理解
 
 Anyway, if you just start to learn some tools, I will try to explain some parts during this and the following posts. Alright, this is the end of the simple introduction, and now we can start to dive into the kernel and low-level stuff.
 
