@@ -1,3 +1,5 @@
+これは[0xAX/linux-insides: A little bit about a linux kernel](https://github.com/0xAX/linux-insides)の非公式翻訳です。
+
 linux-insides
 ===============
 
