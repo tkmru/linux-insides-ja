@@ -1,26 +1,31 @@
 Kernel booting process. Part 1.
 ================================================================================
 
-From the bootloader to the kernel
+bootloaderからkernelまで
 --------------------------------------------------------------------------------
 
-If you have been reading my previous [blog posts](http://0xax.blogspot.com/search/label/asm), then you can see that, for some time, I have been starting to get involved in low-level programming. I have written some posts about x86_64 assembly programming for Linux and, at the same time, I have also started to dive into the Linux source code. I have a great interest in understanding how low-level things work, how programs run on my computer, how are they located in memory, how the kernel manages processes & memory, how the network stack works at a low level, and many many other things. So, I have decided to write yet another series of posts about the Linux kernel for **x86_64**.
 
-Note that I'm not a professional kernel hacker and I don't write code for the kernel at work. It's just a hobby. I just like low-level stuff, and it is interesting for me to see how these things work. So if you notice anything confusing, or if you have any questions/remarks, ping me on Twitter [0xAX](https://twitter.com/0xAX), drop me an [email](anotherworldofworld@gmail.com) or just create an [issue](https://github.com/0xAX/linux-insides/issues/new). I appreciate it. All posts will also be accessible at [linux-insides](https://github.com/0xAX/linux-insides) and, if you find something wrong with my English or the post content, feel free to send a pull request.
+もし私のブログの[記事](http://0xax.blogspot.com/search/label/asm)を読まれた方はご存じかと思いますが、ちょっと前からレイヤーが低レベルのプログラミングを行っています。
+Linux用x86_64アセンブリによるプログラミングについて記事を書いていて、Linuxのソースコードにも触れるようになりました。
+ローレイヤーがどのように機能しているのか、コンピュータでプログラムがどのように実行されるのか、どのようにメモリに配置されるのか、kernelがどのようにプロセスとメモリを扱うのか、ローレイヤーでネットワークスタックがどのように動くのか等、多くのことを理解しようととても興味が湧いています。
+それで、**x86_64** のLinux kernelについてのシリーズを書こうと決心しました。
 
+私はプロのカーネルプログラマではないことと、仕事でもカーネルのコードを書いていないことをご了承ください。
+ただの趣味です。私はローレイヤーが単に好きで、どのようにして動いているのかとても興味があります。もし何か困惑した点や、ご質問やご意見がありましたら、twitter [0xAX](https://twitter.com/0xAX) や [email](anotherworldofworld@gmail.com) でお知らせいただくか、[issue](https://github.com/0xAX/linux-insides/issues/new)を作成してください。
+そうしてくれると助かります。全ての記事は [linux-insides](https://github.com/0xAX/linux-insides) からアクセスでき、私の英文が間違っていたり内容に問題があったりした場合は、気軽にプルリクエストを送ってください。
 
-*Note that this isn't official documentation, just learning and sharing knowledge.*
+*これは正式なドキュメントではありません。あくまでも学習のためや知識共有のためのものですのでご注意ください。*
 
-**Required knowledge**
+**必要な知識**
 
-* Understanding C code
-* Understanding assembly code (AT&T syntax)
+* Cコードの理解
+* アセンブリ(AT&T記法)の理解
 
-Anyway, if you just start to learn some tools, I will try to explain some parts during this and the following posts. Alright, this is the end of the simple introduction, and now we can start to dive into the kernel and low-level stuff.
+ツールについて学び始めている人のために、この記事とつづく記事の中で説明を入れようと思います。さて、簡単な導入はここで終わりにして、今からkernelとローレイヤーにダイブしましょう。
 
-All code is actually for the 3.18 kernel. If there are changes, I will update the posts accordingly.
+全てのコードはkernel 3.18のものです。変更があった場合は、私はそれに応じて更新します。
 
-The Magical Power Button, What happens next?
+魔法の電源ボタンの次はなにが起こるのか？
 --------------------------------------------------------------------------------
 
 Although this is a series of posts about the Linux kernel, we will not be starting from the kernel code - at least not, in this paragraph. As soon as you press the magical power button on your laptop or desktop computer, it starts working. The motherboard sends a signal to the [power supply](https://en.wikipedia.org/wiki/Power_supply). After receiving the signal, the power supply provides the proper amount of electricity to the computer. Once the motherboard receives the [power good signal](https://en.wikipedia.org/wiki/Power_good_signal), it tries to start the CPU. The CPU resets all leftover data in its registers and sets up predefined values for each of them.
@@ -34,7 +39,8 @@ CS selector 0xf000
 CS base     0xffff0000
 ```
 
-The processor starts working in [real mode](https://en.wikipedia.org/wiki/Real_mode). Let's back up a little and try to understand memory segmentation in this mode. Real mode is supported on all x86-compatible processors, from the [8086](https://en.wikipedia.org/wiki/Intel_8086) all the way to the modern Intel 64-bit CPUs. The 8086 processor has a 20-bit address bus, which means that it could work with a 0-0xFFFFF address space (1 megabyte). But it only has 16-bit registers, which have a maximum address of `2^16 - 1` or `0xffff` (64 kilobytes). [Memory segmentation](http://en.wikipedia.org/wiki/Memory_segmentation) is used to make use of all the address space available. All memory is divided into small, fixed-size segments of 65536 bytes (64 KB). Since we cannot address memory above 64 KB with 16-bit registers, an alternate method is devised. An address consists of two parts: a segment selector, which has a base address, and an offset from this base address. In real mode, the associated base address of a segment selector is `Segment Selector * 16`. Thus, to get a physical address in memory, we need to multiply the segment selector part by 16 and add the offset:
+
+The processor starts working in [real mode](https://en.wikipedia.org/wiki/Real_mode). Let's back up a little and try to understand memory segmentation in this mode. Real mode is supported on all x86-compatible processors, from the [8086](https://en.wikipedia.org/wiki/Intel_8086) all the way to the modern Intel 64-bit CPUs. The 8086 processor has a 20-bit address bus, which means that it could work with a 0-0xFFFFF address space (1 megabyte). But it only has 16-bit registers, which have a maximum address of `2^16 - 1` or `0xffff` (64 kilobytes). [Memory segmentation](http://en.wikipedia.org/wiki/Memory_segmentation) is used to make use of all the address space available. All memory is divided into small, fixed-size segments of 65536 bytes (64 KB). Since we cannot address memory above 64 KB with 16 bit registers, an alternate method is devised. An address consists of two parts: a segment selector, which has a base address, and an offset from this base address. In real mode, the associated base address of a segment selector is `Segment Selector * 16`. Thus, to get a physical address in memory, we need to multiply the segment selector part by 16 and add the offset:
 
 ```
 PhysicalAddress = Segment Selector * 16 + Offset
@@ -243,7 +249,7 @@ where `X` is the address of the kernel boot sector being loaded. In my case, `X`
 
 The bootloader has now loaded the Linux kernel into memory, filled the header fields, and then jumped to the corresponding memory address. We can now move directly to the kernel setup code.
 
-Start of Kernel Setup
+Kernelの設定を始める
 --------------------------------------------------------------------------------
 
 Finally, we are in the kernel! Technically, the kernel hasn't run yet; first, we need to set up the kernel, memory manager, process manager, etc. Kernel setup execution starts from [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S) at [_start](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L293). It is a little strange at first sight, as there are several instructions before it.
@@ -336,7 +342,8 @@ After the jump to `start_of_setup`, the kernel needs to do the following:
 
 Let's look at the implementation.
 
-Segment registers align
+
+セグメントレジスタのアライメント
 --------------------------------------------------------------------------------
 
 First of all, the kernel ensures that `ds` and `es` segment registers point to the same address. Next, it clears the direction flag using the `cld` instruction:
@@ -363,9 +370,9 @@ _start:
     lretw
 ```
 
-which pushes the value of `ds` to the stack with the address of the [6](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L494) label and executes the `lretw` instruction. When the `lretw` instruction is called, it loads the address of label `6` into the [instruction pointer](https://en.wikipedia.org/wiki/Program_counter) register and loads `cs` with the value of `ds`. Afterward, `ds` and `cs` will have the same values.
+which pushes the value of `ds` to the stack with the address of the [6](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L494) label and executes the `lretw` instruction. When the `lretw` instruction is called, it loads the address of label `6` into the [instruction pointer](https://en.wikipedia.org/wiki/Program_counter) register and loads `cs` with the value of `ds`. Afterwards, `ds` and `cs` will have the same values.
 
-Stack Setup
+スタックの設定
 --------------------------------------------------------------------------------
 
 Almost all of the setup code is in preparation for the C language environment in real mode. The next [step](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L467) is checking the `ss` register value and making a correct stack if `ss` is wrong:
@@ -430,7 +437,7 @@ If the `CAN_USE_HEAP` bit is set, we put `heap_end_ptr` into `dx` (which points 
 
 ![minimal stack](http://oi60.tinypic.com/28w051y.jpg)
 
-BSS Setup
+BSSの設定
 --------------------------------------------------------------------------------
 
 The last two steps that need to happen before we can jump to the main C code are setting up the [BSS](https://en.wikipedia.org/wiki/.bss) area and checking the "magic" signature. First, signature checking:
@@ -459,7 +466,7 @@ First, the [__bss_start](https://github.com/torvalds/linux/blob/master/arch/x86/
 
 ![bss](http://oi59.tinypic.com/29m2eyr.jpg)
 
-Jump to main
+main関数へのジャンプ
 --------------------------------------------------------------------------------
 
 That's all - we have the stack and BSS, so we can jump to the `main()` C function:
@@ -470,14 +477,14 @@ That's all - we have the stack and BSS, so we can jump to the `main()` C functio
 
 The `main()` function is located in [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c). You can read about what this does in the next part.
 
-Conclusion
+結論
 --------------------------------------------------------------------------------
 
-This is the end of the first part about Linux kernel insides. If you have questions or suggestions, ping me on Twitter [0xAX](https://twitter.com/0xAX), drop me an [email](anotherworldofworld@gmail.com), or just create an [issue](https://github.com/0xAX/linux-internals/issues/new). In the next part, we will see the first C code that executes in the Linux kernel setup, the implementation of memory routines such as `memset`, `memcpy`, `earlyprintk`, early console implementation and initialization, and much more.
+This is the end of the first part about Linux kernel insides. If you have questions or suggestions, ping me on twitter [0xAX](https://twitter.com/0xAX), drop me an [email](anotherworldofworld@gmail.com), or just create an [issue](https://github.com/0xAX/linux-internals/issues/new). In the next part, we will see the first C code that executes in the Linux kernel setup, the implementation of memory routines such as `memset`, `memcpy`, `earlyprintk`, early console implementation and initialization, and much more.
 
 **Please note that English is not my first language and I am really sorry for any inconvenience. If you find any mistakes please send me PR to [linux-insides](https://github.com/0xAX/linux-internals).**
 
-Links
+リンク
 --------------------------------------------------------------------------------
 
   * [Intel 80386 programmer's reference manual 1986](http://css.csail.mit.edu/6.858/2014/readings/i386.pdf)

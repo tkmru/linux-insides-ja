@@ -4,7 +4,7 @@ Kernel booting process. Part 4.
 Transition to 64-bit mode
 --------------------------------------------------------------------------------
 
-This is the fourth part of the `Kernel booting process` where we will see first steps in [protected mode](http://en.wikipedia.org/wiki/Protected_mode), like checking that CPU supports [long mode](http://en.wikipedia.org/wiki/Long_mode) and [SSE](http://en.wikipedia.org/wiki/Streaming_SIMD_Extensions), [paging](http://en.wikipedia.org/wiki/Paging), initializes the page tables and at the end we will discuss the transition to [long mode](https://en.wikipedia.org/wiki/Long_mode).
+This is the fourth part of the `Kernel booting process` where we will see first steps in [protected mode](http://en.wikipedia.org/wiki/Protected_mode), like checking that cpu supports [long mode](http://en.wikipedia.org/wiki/Long_mode) and [SSE](http://en.wikipedia.org/wiki/Streaming_SIMD_Extensions), [paging](http://en.wikipedia.org/wiki/Paging), initializes the page tables and at the end we will discuss the transition to [long mode](https://en.wikipedia.org/wiki/Long_mode).
 
 **NOTE: there will be much assembly code in this part, so if you are not familiar with that, you might want to consult a book about it**
 
@@ -294,7 +294,7 @@ If the value of the `eax` register is zero, everything is ok and we are able to 
 Calculate relocation address
 --------------------------------------------------------------------------------
 
-The next step is calculating relocation address for decompression if needed. First, we need to know what it means for a kernel to be `relocatable`. We already know that the base address of the 32-bit entry point of the Linux kernel is `0x100000`, but that is a 32-bit entry point. The default base address of the Linux kernel is determined by the value of the `CONFIG_PHYSICAL_START` kernel configuration option. Its default value is `0x1000000` or `16 MB`. The main problem here is that if the Linux kernel crashes, a kernel developer must have a `rescue kernel` for [kdump](https://www.kernel.org/doc/Documentation/kdump/kdump.txt) which is configured to load from a different address. The Linux kernel provides special configuration option to solve this problem: `CONFIG_RELOCATABLE`. As we can read in the documentation of the Linux kernel:
+The next step is calculating relocation address for decompression if needed. First we need to know what it means for a kernel to be `relocatable`. We already know that the base address of the 32-bit entry point of the Linux kernel is `0x100000`, but that is a 32-bit entry point. The default base address of the Linux kernel is determined by the value of the `CONFIG_PHYSICAL_START` kernel configuration option. Its default value is `0x1000000` or `16 MB`. The main problem here is that if the Linux kernel crashes, a kernel developer must have a `rescue kernel` for [kdump](https://www.kernel.org/doc/Documentation/kdump/kdump.txt) which is configured to load from a different address. The Linux kernel provides special configuration option to solve this problem: `CONFIG_RELOCATABLE`. As we can read in the documentation of the Linux kernel:
 
 ```
 This builds a kernel image that retains relocation information
@@ -305,7 +305,7 @@ it has been loaded at and the compile time physical address
 (CONFIG_PHYSICAL_START) is used as the minimum location.
 ```
 
-In simple terms, this means that the Linux kernel with the same configuration can be booted from different addresses. Technically, this is done by compiling the decompressor as [position independent code](https://en.wikipedia.org/wiki/Position-independent_code). If we look at [arch/x86/boot/compressed/Makefile](https://github.com/torvalds/linux/blob/master/arch/x86/boot/compressed/Makefile), we will see that the decompressor is indeed compiled with the `-fPIC` flag:
+In simple terms this means that the Linux kernel with the same configuration can be booted from different addresses. Technically, this is done by compiling the decompressor as [position independent code](https://en.wikipedia.org/wiki/Position-independent_code). If we look at [arch/x86/boot/compressed/Makefile](https://github.com/torvalds/linux/blob/master/arch/x86/boot/compressed/Makefile), we will see that the decompressor is indeed compiled with the `-fPIC` flag:
 
 ```Makefile
 KBUILD_CFLAGS += -fno-strict-aliasing -fPIC

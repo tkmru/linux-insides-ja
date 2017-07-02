@@ -9,7 +9,8 @@ This is the third part of the `Kernel booting process` series. In the previous [
 - preparation before switching into protected mode,
 - transition to protected mode
 
-**NOTE** If you don't know anything about protected mode, you can find some information about it in the previous [part](linux-bootstrap-2.md#protected-mode). Also, there are a couple of [links](linux-bootstrap-2.md#links) which can help you.
+**NOTE** If you don't know anything about protected mode, you can find some information about it in the previous [part](linux-bootstrap-2.md#protected-mode). Also there are a couple of [links](linux-bootstrap-2.md#links) which can help you.
+
 
 As I wrote above, we will start from the `set_video` function which is defined in the [arch/x86/boot/video.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/video.c#L315) source code file. We can see that it starts by first getting the video mode from the `boot_params.hdr` structure:
 
@@ -375,6 +376,7 @@ static void setup_idt(void)
 ```
 
 which sets up the Interrupt Descriptor Table (describes interrupt handlers and etc.). For now, the IDT is not installed (we will see it later), but now we just the load IDT with the `lidtl` instruction. `null_idt` contains address and size of IDT, but now they are just zero. `null_idt` is a `gdt_ptr` structure, it as defined as:
+
 ```C
 struct gdt_ptr {
 	u16 len;
