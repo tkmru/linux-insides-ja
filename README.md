@@ -7,7 +7,7 @@ linuxカーネルとその内部についての製作中の本です。
 
 **目標はシンプルです** - Linuxカーネルの内部についての私の知識を共有すること、Linuxカーネル内部やその他の低レイヤーのことに興味のある人を助けることです。
 
-**質問/提案**: 質問や提案は twitter [@0xAX](https://twitter.com/0xAX)に連絡を取るか、 [issue](https://github.com/0xAX/linux-insides/issues/new) を追加するか、 [email](mailto:anotherworldofworld@gmail.com)で連絡を取ることで気軽にしてください。
+**質問/提案**: 質問や提案は twitter [@0xAX](https://twitter.com/0xAX) または [email](mailto:anotherworldofworld@gmail.com) で連絡を取るか、 [issue](https://github.com/0xAX/linux-insides/issues/new) を作成することで気軽にしてください。
 
 サポート
 -------
