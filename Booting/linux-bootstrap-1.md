@@ -1,7 +1,7 @@
 Kernel booting process. Part 1.
 ================================================================================
 
-bootloaderからカーネルまで
+ブートローダーからカーネルまで
 --------------------------------------------------------------------------------
 
 
@@ -163,7 +163,7 @@ nasm -f bin boot.nasm
 objdump -D -b binary -mi386 -Maddr16,data16,intel boot
 ```
 
-実際のブートセクタの場合、この続きは多くの0たちや感嘆符ではなく、起動処理とパーティションテーブルになります。これ以降はBIOSからブートローダに動作が移ります。
+実際のブートセクタの場合、この続きは多くの0たちや感嘆符ではなく、起動処理とパーティションテーブルになります。これ以降はBIOSからブートローダーに動作が移ります。
 
 **注**: 上でも書いたようにCPUはリアルモードで動作します。リアルモードでは、メモリ内の物理アドレスを次のように計算します。:
 
@@ -211,8 +211,8 @@ PhysicalAddress = Segment Selector * 16 + Offset
 ブートローダー
 --------------------------------------------------------------------------------
 
-[GRUB2](https://www.gnu.org/software/grub/) や [syslinux](http://www.syslinux.org/wiki/index.php/The_Syslinux_Project) のような、Linuxを起動させることができるブートローダは数多くあります。
-Linuxカーネルは、Linuxサポートを実行するためのブートローダに必要な条件を指定する[Boot protocol](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt)を持っています。
+[GRUB2](https://www.gnu.org/software/grub/) や [syslinux](http://www.syslinux.org/wiki/index.php/The_Syslinux_Project) のような、Linuxを起動させることができるブートローダーは数多くあります。
+Linuxカーネルは、Linuxサポートを実行するためのブートローダーに必要な条件を指定する[Boot protocol](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt)を持っています。
 ここでは例として GRUB2 について述べます。
 
 BIOSはブートデバイスを選んで、ブートセクタコードに対する制御を伝達し、[boot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/boot.S;hb=HEAD)から実行を開始します。
@@ -225,7 +225,7 @@ BIOSはブートデバイスを選んで、ブートセクタコードに対す�
 `grub_normal_execute`（grub-core/normal/main.cより）が最後の準備を完了させ、オペレーティングシステムを選択するためのメニューを表示します。
 GRUBメニューを選択する際に、`grub_menu_execute_entry` が起動し、grub`boot`コマンドを実行して、選択したオペレーティングシステムをブートします。
 
-カーネルのブートプロトコルを見て分かるように、ブートローダはカーネルのセットアップヘッダを読み込み、いくつかのフィールドを満たさなければいけません。
+カーネルのブートプロトコルを見て分かるように、ブートローダーはカーネルのセットアップヘッダを読み込み、いくつかのフィールドを満たさなければいけません。
 そしてそれは、カーネルの設定コードのオフセット `0x01f1` から始まります。
 [リンカスクリプト](https://github.com/torvalds/linux/blob/master/arch/x86/boot/setup.ld#L16)を見ることで、このオフセットは確認できます。
 カーネルヘッダ([arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S)) は次のようにスタートします。:
@@ -242,7 +242,7 @@ hdr:
     boot_flag:   .word 0xAA55
 ```
 
-ブートローダは、これと、（[この例](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L354)のようなLinuxブートプロトコルのwriteでマークされている）残りのヘッダを、コマンドラインまたは計算し求めた値で埋める必要があります。
+ブートローダーは、これと、（[この例](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L354)のようなLinuxブートプロトコルのwriteでマークされている）残りのヘッダを、コマンドラインまたは計算し求めた値で埋める必要があります。
 (カーネルのセットアップヘッダの全てのフィールドの記述や説明についてはここでは触れませんが、後でカーネルがこれらを使用する時に説明します。)
 [boot protocol](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L156)で全てのフィールドの記述を見つけることができます。
 
@@ -273,7 +273,7 @@ X+08000  +------------------------+
 
 ```
 
-ブートローダがカーネルに制御を移したとき、以下のアドレスで開始されます。:
+ブートローダーがカーネルに制御を移したとき、以下のアドレスで開始されます。:
 
 ```
 X + sizeof(KernelBootSector) + 1
@@ -289,19 +289,23 @@ X + sizeof(KernelBootSector) + 1
 Kernelの設定を始める
 --------------------------------------------------------------------------------
 
-Finally, we are in the カーネル! Technically, the カーネル hasn't run yet; first, we need to set up the カーネル, memory manager, process manager, etc. Kernel setup execution starts from [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S) at [_start](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L293). It is a little strange at first sight, as there are several instructions before it.
+われわれは、ついにカーネルまでたどり着きました。しかし、カーネルはまだ起動しません。
+最初に、カーネルとメモリ管理、プロセス管理などの設定が必要になります。
+カーネルのセットアップの実行は[_start](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L293)で
+[arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S)から開始します。
+いくつかの命令が手前にあって、最初は少し奇妙に見えるかもしれません。
 
-A long time ago, the Linux カーネル used to have its own bootloader. Now, however, if you run, for example,
+昔はLinuxカーネルが自前でブートローダーを持っていました。しかし、今は実行すると例のようになります。
 
 ```
 qemu-system-x86_64 vmlinuz-3.18-generic
 ```
 
-then you will see:
+次のような結果が見られるはずです。:
 
 ![Try vmlinuz in qemu](http://oi60.tinypic.com/r02xkz.jpg)
 
-Actually, `header.S` starts from [MZ](https://en.wikipedia.org/wiki/DOS_MZ_executable) (see image above), the error message printing and following the [PE](https://en.wikipedia.org/wiki/Portable_Executable) header:
+実際は（画像にある）[MZ](https://en.wikipedia.org/wiki/DOS_MZ_executable)からheader.Sが開始され、[PE](https://en.wikipedia.org/wiki/Portable_Executable)ヘッダに続いて、エラーメッセージが表示されます。:
 
 ```assembly
 #ifdef CONFIG_EFI_STUB
@@ -317,9 +321,10 @@ pe_header:
     .word 0
 ```
 
-It needs this to load an operating system with [UEFI](https://en.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface). We won't be looking into its inner workings right now and will cover it in upcoming chapters.
+これには[UEFI](https://en.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface)モードでOSを起動することが必要です。
+にこれが内部で動作するかどうか確認しませんが、続く章の中の1つで見ていきましょう。
 
-The actual カーネル setup entry point is:
+これがカーネルセットアップのエントリポイントです。:
 
 ```assembly
 // header.S line 292
@@ -327,7 +332,8 @@ The actual カーネル setup entry point is:
 _start:
 ```
 
-The bootloader (grub2 and others) knows about this point (`0x200` offset from `MZ`) and makes a jump directly to it, despite the fact that `header.S` starts from the `.bstext` section, which prints an error message:
+ブートローダー（grub2など）はこのポイント（`MZ`からのオフセット`0x200`）を知っています。
+`header.S` がエラーメッセージが表示される。`bstext`セクションから始まっているにも関わらず、このエントリポイントへ直接ジャンプします。:
 
 ```
 //
@@ -338,7 +344,7 @@ The bootloader (grub2 and others) knows about this point (`0x200` offset from `M
 .bsdata : { *(.bsdata) }
 ```
 
-The カーネル setup entry point is:
+カーネルセットアップのエントリポイントはこちらです。:
 
 ```assembly
     .globl _start
@@ -351,9 +357,13 @@ _start:
     //
 ```
 
-Here we can see a `jmp` instruction opcode (`0xeb`) that jumps to the `start_of_setup-1f` point. In `Nf` notation, `2f` refers to the following local `2:` label; in our case, it is label `1` that is present right after the jump, and it contains the rest of the setup [header](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L156). Right after the setup header, we see the `.entrytext` section, which starts at the `start_of_setup` label.
+ここでは`start_of_setup-1f`のポイントにジャンプする`jmp`命令のオペコード `0xeb`を見ることが出来ます。
+`Nf`表記が意味するところは、`2f`が次のローカル`2:`ラベルを表しているということです。この場合、ジャンプした直後に行くのがラベル`1`です。
+そこには残りの[セットアップヘッダ](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L156)も含まれます。セットアップヘッダのすぐ後に、`start_of_setup` ラベルで開始される`.entrytext`があります。
 
-This is the first code that actually runs (aside from the previous jump instructions, of course). After the カーネル setup received control from the bootloader, the first `jmp` instruction is located at the `0x200` offset from the start of the カーネル real mode, i.e., after the first 512 bytes. This we can both read in the Linux カーネル boot protocol and see in the grub2 source code:
+実際にはこれが（さっきのジャンプ命令を除いて）最初に実行するコードです。
+カーネルセットアップにブートローダーから制御を移された後に、最初の`jmp`命令がカーネルのリアルモードの開始からオフセット`0x200`（最初の512Byteの後）に格納されます。
+これは次のLinux カーネルブートプロトコルとgrub2のソースコードを見て分かります。:
 
 ```C
 segment = grub_linux_real_target >> 4;
@@ -361,29 +371,29 @@ state.gs = state.fs = state.es = state.ds = state.ss = segment;
 state.cs = segment + 0x20;
 ```
 
-This means that segment registers will have the following values after カーネル setup starts:
+カーネルセットアップが始まった後、セグメントレジスタが以下の値を持つことを意味します。:
 
 ```
 gs = fs = es = ds = ss = 0x1000
 cs = 0x1020
 ```
 
-In my case, the カーネル is loaded at `0x10000`.
+この場合は、カーネルが`0x10000`に置かれます。
 
-After the jump to `start_of_setup`, the カーネル needs to do the following:
+`start_of_setup`にジャンプした後は、カーネルが以下の作業をする必要があります。:
 
-* Make sure that all segment register values are equal
-* Set up a correct stack, if needed
-* Set up [bss](https://en.wikipedia.org/wiki/.bss)
-* Jump to the C code in [main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c)
+* すべてのセグメントレジスタの値が同じか確認する。
+* 必要にであれば、正しくスタックをセットアップする。
+* [bss](https://en.wikipedia.org/wiki/.bss)をセットアップする。
+* [main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c)のCコードにジャンプする。
 
-Let's look at the implementation.
+次は実装を見ていきましょう。
 
 
 セグメントレジスタのアライメント
 --------------------------------------------------------------------------------
 
-First of all, the カーネル ensures that `ds` and `es` segment registers point to the same address. Next, it clears the direction flag using the `cld` instruction:
+まず、セグメントレジスタ `ds`と`es`が同じアドレスを指すようにし、次に`cld`命令を実行してdirection flagをクリアします。:
 
 ```assembly
     movw    %ds, %ax
@@ -391,7 +401,8 @@ First of all, the カーネル ensures that `ds` and `es` segment registers poin
     cld
 ```
 
-As I wrote earlier, grub2 loads カーネル setup code at address `0x10000` and `cs` at `0x1020` because execution doesn't start from the start of file, but from
+前述したとおり、grub2はカーネルのセットアップコードをアドレス`0x10000`に、`cs`に`0x1020`をロードします。
+なぜなら、ファイルの冒頭から実行されるのではなく、以下のコードから実行されるからです。
 
 ```assembly
 _start:
@@ -399,7 +410,8 @@ _start:
     .byte start_of_setup-1f
 ```
 
-`jump`, which is at a 512 byte offset from [4d 5a](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L47). It also needs to align `cs` from `0x10200` to `0x10000`, as well as all other segment registers. After that, we set up the stack:
+`jump`命令は[4d 5a](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L47)から512 Byte離れたところにあります。
+また、他の全てのセグメントレジスタと同じように、`cs`を`0x1020`から`0x10000`までアラインする必要があります。それが終わったらスタックを設定します。:
 
 ```assembly
     pushw   %ds
@@ -407,12 +419,14 @@ _start:
     lretw
 ```
 
-which pushes the value of `ds` to the stack with the address of the [6](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L494) label and executes the `lretw` instruction. When the `lretw` instruction is called, it loads the address of label `6` into the [instruction pointer](https://en.wikipedia.org/wiki/Program_counter) register and loads `cs` with the value of `ds`. Afterwards, `ds` and `cs` will have the same values.
+`ds`の値をスタックにプッシュし、ラベル[6](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L494)のアドレスもスタックにプッシュすると、`lretw`命令が実行されます。
+`lretw`命令を呼び出すと、ラベル6のアドレスが[instruction pointer](https://en.wikipedia.org/wiki/Program_counter)レジスタにロードされ、`ds`の値が`cs`にロードされます。
+それが完了すると、`ds`と`cs`は同じ値を持つようになります。
 
 スタックの設定
 --------------------------------------------------------------------------------
 
-Almost all of the setup code is in preparation for the C language environment in real mode. The next [step](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L467) is checking the `ss` register value and making a correct stack if `ss` is wrong:
+リアルモードでだいたい全てのセットアップコードは、C言語の開発環境を作る準備となります。次の[ステップ](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L467)では`ss`レジスタの値をチェックし、もし`ss`が間違っている場合は正しいスタックを設定します。:
 
 ```assembly
     movw    %ss, %dx
@@ -421,15 +435,15 @@ Almost all of the setup code is in preparation for the C language environment in
     je      2f
 ```
 
-This can lead to 3 different scenarios:
+これは、異なる3つのシナリオを導くことが可能です。:
 
-* `ss` has valid value `0x10000` (as do all other segment registers beside `cs`)
-* `ss` is invalid and `CAN_USE_HEAP` flag is set     (see below)
-* `ss` is invalid and `CAN_USE_HEAP` flag is not set (see below)
+* `ss`が有効値0x10000を持つ（`cs`を除く全てのセグメントレジスタと同様）
+* `ss`は無効で、`CAN_USE_HEAP`フラグがセットされている（下記参照）
+* `ss`は無効で、`CAN_USE_HEAP`フラグがセットされていない（下記参照）
 
-Let's look at all three of these scenarios in turn:
+3つのすべてのシナリオを全て見てみましょう。
 
-* `ss` has a correct address (`0x10000`). In this case, we go to label [2](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L481):
+* `ss`は正しいアドレス（0x10000）を持つ。この場合、ラベル[2](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L481)へと飛びます。:
 
 ```assembly
 2:  andw    $~3, %dx
@@ -440,11 +454,14 @@ Let's look at all three of these scenarios in turn:
     sti
 ```
 
-Here we can see the alignment of `dx` (contains `sp` given by bootloader) to 4 bytes and a check for whether or not it is zero. If it is zero, we put `0xfffc` (4 byte aligned address before the maximum segment size of 64 KB) in `dx`. If it is not zero, we continue to use `sp`, given by the bootloader (0xf7f4 in my case). After this, we put the `ax` value into `ss`, which stores the correct segment address of `0x10000` and sets up a correct `sp`. We now have a correct stack:
+ここで、`dx`（ブートローダーによって与えられる`sp`を含みます）が4Byte にアライメントされ、0になっているかどうか確認できます。
+もし0の場合は`0xfffc`（最大のセグメントサイズの64KBより前で4Byteにアラインされたアドレス）を`dx`に代入します。
+0でない場合は、引き続きブートローダーから与えられたsp（この例では0xf7f4）を使います。
+正しいセグメントアドレス`0x10000`を格納しているssにaxの値を代入した後で、正しいspの値を設定します。これで正しくスタックを設定できました。:
 
 ![stack](http://oi58.tinypic.com/16iwcis.jpg)
 
-* In the second scenario, (`ss` != `ds`). First, we put the value of [_end](https://github.com/torvalds/linux/blob/master/arch/x86/boot/setup.ld#L52) (the address of the end of the setup code) into `dx` and check the `loadflags` header field using the `testb` instruction to see whether we can use the heap. [loadflags](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L321) is a bitmask header which is defined as:
+* 2つ目のシナリオでは（`ss` != `ds`）となります。最初に、[_end](https://github.com/torvalds/linux/blob/master/arch/x86/boot/setup.ld#L52)(セットアップコードの最後のアドレス)の値をdxに置き、`loadflags`のヘッダフィールドを`testb`命令を使ってチェックし、ヒープ領域を使えるかどうかを確認します。[loadflags](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L321)は、以下のように定義されるビットマスクヘッダです。:
 
 ```C
 #define LOADED_HIGH     (1<<0)
@@ -453,7 +470,7 @@ Here we can see the alignment of `dx` (contains `sp` given by bootloader) to 4 b
 #define CAN_USE_HEAP    (1<<7)
 ```
 
-and, as we can read in the boot protocol,
+そしてブートプロトコルを読むと、以下のように書かれています。
 
 ```
 Field name: loadflags
@@ -466,11 +483,12 @@ Field name: loadflags
     functionality will be disabled.
 ```
 
-If the `CAN_USE_HEAP` bit is set, we put `heap_end_ptr` into `dx` (which points to `_end`) and add `STACK_SIZE` (minimum stack size, 512 bytes) to it. After this, if `dx` is not carried (it will not be carried, dx = _end + 512), jump to label `2` (as in the previous case) and make a correct stack.
+`CAN_USE_HEAP`のbitがセットされたときは、`_end`を指す`dx`に`heap_end_ptr`を置き、そこに`STACK_SIZE`（最小のスタックのサイズは512Byte）を加えます。
+これ以降、dxがキャリーされていない場合（キャリーされてなければ、dx = _end + 512となる）、ラベル`2`(前のケースと同じように)にジャンプし、正しいスタックを作ります。
 
 ![stack](http://oi62.tinypic.com/dr7b5w.jpg)
 
-* When `CAN_USE_HEAP` is not set, we just use a minimal stack from `_end` to `_end + STACK_SIZE`:
+* `CAN_USE_HEAP`がセットされてないとき、`_end`から`_end + STACK_SIZE`までの最小のスタックを使います。:
 
 ![minimal stack](http://oi60.tinypic.com/28w051y.jpg)
 
