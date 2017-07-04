@@ -1,14 +1,14 @@
 Kernel booting process. Part 1.
 ================================================================================
 
-bootloaderからkernelまで
+bootloaderからカーネルまで
 --------------------------------------------------------------------------------
 
 
 もし私のブログの[記事](http://0xax.blogspot.com/search/label/asm)を読まれた方はご存じかと思いますが、ちょっと前からレイヤーが低レベルのプログラミングを行っています。
 Linux用x86_64アセンブリによるプログラミングについて記事を書いていて、Linuxのソースコードにも触れるようになりました。
-ローレイヤーがどのように機能しているのか、コンピュータでプログラムがどのように実行されるのか、どのようにメモリに配置されるのか、kernelがどのようにプロセスとメモリを扱うのか、ローレイヤーでネットワークスタックがどのように動くのか等、多くのことを理解しようととても興味が湧いています。
-それで、**x86_64** のLinux kernelについてのシリーズを書こうと決心しました。
+ローレイヤーがどのように機能しているのか、コンピュータでプログラムがどのように実行されるのか、どのようにメモリに配置されるのか、カーネルがどのようにプロセスとメモリを扱うのか、ローレイヤーでネットワークスタックがどのように動くのか等、多くのことを理解しようととても興味が湧いています。
+それで、**x86_64** のLinux カーネルについてのシリーズを書こうと決心しました。
 
 私はプロのカーネルプログラマではないことと、仕事でもカーネルのコードを書いていないことをご了承ください。
 ただの趣味です。私はローレイヤーが単に好きで、どのようにして動いているのかとても興味があります。もし何か困惑した点や、ご質問やご意見がありましたら、twitter [0xAX](https://twitter.com/0xAX) や [email](anotherworldofworld@gmail.com) でお知らせいただくか、[issue](https://github.com/0xAX/linux-insides/issues/new)を作成してください。
@@ -21,14 +21,14 @@ Linux用x86_64アセンブリによるプログラミングについて記事を
 * Cコードの理解
 * アセンブリ(AT&T記法)の理解
 
-ツールについて学び始めている人のために、この記事とつづく記事の中で説明を入れようと思います。さて、簡単な導入はここで終わりにして、今からkernelとローレイヤーにダイブしましょう。
+ツールについて学び始めている人のために、この記事とつづく記事の中で説明を入れようと思います。さて、簡単な導入はここで終わりにして、今からカーネルとローレイヤーにダイブしましょう。
 
-全てのコードはkernel 3.18のものです。変更があった場合は、私はそれに応じて更新します。
+全てのコードはカーネル 3.18のものです。変更があった場合は、私はそれに応じて更新します。
 
 魔法の電源ボタンの次はなにが起こるのか？
 --------------------------------------------------------------------------------
 
-本連載はLinux kernelついてのシリーズですが、kernel コードからは始めません。 - 少なくともこの段落では。ラップトップやデスクトップコンピューターは魔法の電源ボタンを押すと起動します。
+本連載はLinux カーネルついてのシリーズですが、カーネル コードからは始めません。 - 少なくともこの段落では。ラップトップやデスクトップコンピューターは魔法の電源ボタンを押すと起動します。
 マザーボードは電源回路([power supply](https://en.wikipedia.org/wiki/Power_supply))に信号を送ります。
 信号を受信した後、電源はコンピュータに適切な量の電力を供給します。
 マザーボードは、[power good signal](https://en.wikipedia.org/wiki/Power_good_signal)を受信すると、CPUを起動しようとします。
@@ -46,7 +46,7 @@ CS base     0xffff0000
 プロセッサは[リアルモード](https://en.wikipedia.org/wiki/Real_mode)で動き始めます。少し戻って、このモードの memory segmentation を理解しましょう。リアルモードは、[8086](https://en.wikipedia.org/wiki/Intel_8086)から、最新のIntel 64-bit CPUまでのすべてのx86互換のプロセッサに導入されています。
 8086プロセッサには20-bit アドレスバスがあります。つまり、0-0xFFFFF(1MB)のアドレス空間を利用できます。
 しかし、16ビットのレジスタしかなく、16ビットのレジスタが使用できるアドレスは最大で `2^16-1`、 または `0xffff`(64KB)までです。[Memory segmentation](http://en.wikipedia.org/wiki/Memory_segmentation)は、r利用可能なアドレス空間すべてを利用するために用いられる方法です。
-全てのメモリは65535 Bytesまたは64KBの固定長の小さなセグメントに分けられます。16-bit レジスタでは、64KB以上のメモリ位置にアクセスできないので、別の方法でアクセスします。
+全てのメモリは65535 Byteまたは64KBの固定長の小さなセグメントに分けられます。16-bit レジスタでは、64KB以上のメモリ位置にアクセスできないので、別の方法でアクセスします。
 アドレスは2つのパートで構成されます: ベースアドレスを持つセグメントセレクタとそのバースアドレスからのオフセットである。
 リアルモードでは、セグメントセレクタのベースアドレスは`Segment Selector * 16`となります。
 そのため、物理アドレスを得るには、セグメントアドレスに16をかけたものに、オフセットアドレスを足す必要があります。:
@@ -69,20 +69,25 @@ PhysicalAddress = Segment Selector * 16 + Offset
 '0x10ffef'
 ```
 
-which is 65520 bytes past the first megabyte. Since only one megabyte is accessible in real mode, `0x10ffef` becomes `0x00ffef` with disabled [A20](https://en.wikipedia.org/wiki/A20_line).
+つまり、最初の1MBよりも65519Byteオーバーしていることになります。リアルモードでアクセスできるのは最大で1MBのため、[A20ライン](https://en.wikipedia.org/wiki/A20_line)が無効になっていると`0x10ffef`は`0x00ffef`になります。
 
-Ok, now we know about real mode and memory addressing. Let's get back to discussing register values after reset:
+リアルモードとmemory addressingが分かったところで、リセット後のレジスタの値について説明しましょう。
 
-The `CS` register consists of two parts: the visible segment selector, and the hidden base address. While the base address is normally formed by multiplying the segment selector value by 16, during a hardware reset the segment selector in the CS register is loaded with `0xf000` and the base address is loaded with `0xffff0000`; the processor uses this special base address until `CS` is changed.
+`CS`レジスタは、見えるセグメントセレクタと隠れたベースアドレスの2つの部分で構成されています。 ベースアドレスは、セグメントセレクタの値に16を乗算することによって形成されるが、ハードウェアがリセットされる間、CSレジスタ内のセグメントセレクタには`0xf000`が代入され、ベースアドレスに`0xffff0000`が代入されます。 プロセッサは、`CS`が変更されるまで、この特殊なベースアドレスを使用します。
 
-The starting address is formed by adding the base address to the value in the EIP register:
+
+開始するアドレスはベースアドレスをEIPレジスタの値に足すことで生成されます。:
 
 ```python
 >>> 0xffff0000 + 0xfff0
 '0xfffffff0'
 ```
 
-We get `0xfffffff0`, which is 16 bytes below 4GB. This point is called the [Reset vector](http://en.wikipedia.org/wiki/Reset_vector). This is the memory location at which the CPU expects to find the first instruction to execute after reset. It contains a [jump](http://en.wikipedia.org/wiki/JMP_%28x86_instruction%29) (`jmp`) instruction that usually points to the BIOS entry point. For example, if we look in the [coreboot](http://www.coreboot.org/) source code, we see:
+その結果、`0xfffffff0`ができ、この値は4GBより16byte小さいです。
+このポイントを[Reset vector](http://en.wikipedia.org/wiki/Reset_vector)と呼びます。
+このメモリ配置には、リセット後にCPUが最初に実行するプログラムが置かれています。
+これには、[`JMP`](http://en.wikipedia.org/wiki/JMP_%28x86_instruction%29) 命令が含まれ、BIOSのエントリポイントを指しています。
+例えば、[coreboot](http://www.coreboot.org/)のソースコードを見ると、次のように書かれています。:
 
 ```assembly
     .section ".reset"
@@ -94,7 +99,7 @@ reset_vector:
     ...
 ```
 
-Here we can see the `jmp` instruction [opcode](http://ref.x86asm.net/coder32.html#xE9), which is `0xe9`, and its destination address at `_start - ( . + 2)`. We can also see that the `reset` section is 16 bytes and that it starts at `0xfffffff0`:
+JMP命令の[オペコード](http://ref.x86asm.net/coder32.html#xE9)である`0xe9`と、そのデスティネーションアドレスである`_start - ( . + 2)`があります。また、`reset`セクションが16 Byteで`0xfffffff0`から始まることが分かります。:
 
 ```
 SECTIONS {
@@ -108,7 +113,10 @@ SECTIONS {
 }
 ```
 
-Now the BIOS starts; after initializing and checking the hardware, the BIOS needs to find a bootable device. A boot order is stored in the BIOS configuration, controlling which devices the BIOS attempts to boot from. When attempting to boot from a hard drive, the BIOS tries to find a boot sector. On hard drives partitioned with an MBR partition layout, the boot sector is stored in the first 446 bytes of the first sector, where each sector is 512 bytes. The final two bytes of the first sector are `0x55` and `0xaa`, which designates to the BIOS that this device is bootable. For example:
+ここでBIOSが実行されます。ハードウェアの初期化とチェックを行い、BIOSはブートできるデバイスを探す必要があります。
+ブート順位はBIOSの設定に保存されており、カーネルがどのデバイスを使用して起動するのかを操作します。
+ハードドライブから起動しようとする場合、BIOSはブートセクタを探そうとします。
+ハードディスクにMBRのパーティションがある場合、ブートセクタは最初のセクター（512 Byte）の最初の446 Byteに置かれています。最初のセクターの最後2バイトは`0x55`と`0xaa`で、BIOSにこのデバイスがブート可能であることを知らせます。例:
 
 ```assembly
 ;
@@ -132,45 +140,49 @@ db 0x55
 db 0xaa
 ```
 
-Build and run this with:
+ビルドして実行します:
 
 ```
 nasm -f bin boot.nasm && qemu-system-x86_64 boot
 ```
 
-This will instruct [QEMU](http://qemu.org) to use the `boot` binary that we just built as a disk image. Since the binary generated by the assembly code above fulfills the requirements of the boot sector (the origin is set to `0x7c00` and we end with the magic sequence), QEMU will treat the binary as the master boot record (MBR) of a disk image.
+上のコードが[QEMU](http://qemu.org)にディスクイメージとしてビルドした`boot`バイナリを使用するよう命令します。
+上のアセンブリコードによって生成されるバイナリはブートセクタの要件（開始位置は`0x7c00`に設定され、マジックシーケンスで終点を指定）を満たしているので、QEMUはそのバイナリをディスクイメージのMBR(master boot record)として扱います。
 
-You will see:
+このようになります:
 
 ![Simple bootloader which prints only `!`](http://oi60.tinypic.com/2qbwup0.jpg)
 
-In this example, we can see that the code will be executed in 16-bit real mode and will start at `0x7c00` in memory. After starting, it calls the [0x10](http://www.ctyme.com/intr/rb-0106.htm) interrupt, which just prints the `!` symbol; it fills the remaining 510 bytes with zeros and finishes with the two magic bytes `0xaa` and `0x55`.
+この例では、16-bit リアルモードでコードが実行され、メモリの`0x7c00`から始まります。
+実行されると、[0x10](http://www.ctyme.com/intr/rb-0106.htm) 割り込みが呼び出され、`!`シンボルが出力されます。残りの510 Byteを0で埋め、2つのマジックバイト`0xaa`と`0x55`で終わります。
 
-You can see a binary dump of this using the `objdump` utility:
+`objdump`でダンプした結果は以下のコマンドで見れます:
 
 ```
 nasm -f bin boot.nasm
 objdump -D -b binary -mi386 -Maddr16,data16,intel boot
 ```
 
-A real-world boot sector has code for continuing the boot process and a partition table instead of a bunch of 0's and an exclamation mark :) From this point onwards, the BIOS hands over control to the bootloader.
+実際のブートセクタの場合、この続きは多くの0たちや感嘆符ではなく、起動処理とパーティションテーブルになります。これ以降はBIOSからブートローダに動作が移ります。
 
-**NOTE**: As explained above, the CPU is in real mode; in real mode, calculating the physical address in memory is done as follows:
+**注**: 上でも書いたようにCPUはリアルモードで動作します。リアルモードでは、メモリ内の物理アドレスを次のように計算します。:
 
 ```
 PhysicalAddress = Segment Selector * 16 + Offset
 ```
 
-just as explained before. We have only 16-bit general purpose registers; the maximum value of a 16-bit register is `0xffff`, so if we take the largest values, the result will be:
+前述したように、16bit の汎用レジスタしかなく、16-bit レジスタの最大値は`0xffff`のため、最大値を取ると次のようになります。:
 
 ```python
 >>> hex((0xffff * 16) + 0xffff)
 '0x10ffef'
 ```
 
-where `0x10ffef` is equal to `1MB + 64KB - 16b`. An [8086](https://en.wikipedia.org/wiki/Intel_8086) processor (which was the first processor with real mode), in contrast, has a 20-bit address line. Since `2^20 = 1048576` is 1MB, this means that the actual available memory is 1MB.
+0x10ffefは、`1MB + 64KB - 16B`と同じになります。
+しかし、[8086](https://en.wikipedia.org/wiki/Intel_8086)プロセッサは、リアルモードが搭載された初めてのプロセッサであり、A20アドレスラインを持っています。
+また、2^20 = 1048576は1MBなので、実際に使用可能なメモリは1MBとなっています。
 
-General real mode's memory map is as follows:
+一般的なリアルモードでのメモリマップは次のとおりです。:
 
 ```
 0x00000000 - 0x000003FF - Real Mode Interrupt Vector Table
@@ -186,24 +198,37 @@ General real mode's memory map is as follows:
 0x000F0000 - 0x000FFFFF - System BIOS
 ```
 
-In the beginning of this post, I wrote that the first instruction executed by the CPU is located at address `0xFFFFFFF0`, which is much larger than `0xFFFFF` (1MB). How can the CPU access this address in real mode? The answer is in the [coreboot](http://www.coreboot.org/Developer_Manual/Memory_map) documentation:
+本稿の最初の部分でも書きましたが、CPUが実行する最初の処理は `0xFFFFFFF0` アドレスに配置されています。
+これは、`0xFFFFF` (1MB)よりはるかに大きい領域です。CPUはどのようにしてこのリアルモードでアクセスするのでしょうか。
+これは[coreboot](http://www.coreboot.org/Developer_Manual/Memory_map)のドキュメントに記載されています。:
 
 ```
 0xFFFE_0000 - 0xFFFF_FFFF: 128 kilobyte ROM mapped into address space
 ```
 
-At the start of execution, the BIOS is not in RAM, but in ROM.
+実行時、BIOSはRAMではなくROMに置かれています。
 
-Bootloader
+ブートローダー
 --------------------------------------------------------------------------------
 
-There are a number of bootloaders that can boot Linux, such as [GRUB 2](https://www.gnu.org/software/grub/) and [syslinux](http://www.syslinux.org/wiki/index.php/The_Syslinux_Project). The Linux kernel has a [Boot protocol](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt) which specifies the requirements for a bootloader to implement Linux support. This example will describe GRUB 2.
+[GRUB2](https://www.gnu.org/software/grub/) や [syslinux](http://www.syslinux.org/wiki/index.php/The_Syslinux_Project) のような、Linuxを起動させることができるブートローダは数多くあります。
+Linuxカーネルは、Linuxサポートを実行するためのブートローダに必要な条件を指定する[Boot protocol](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt)を持っています。
+ここでは例として GRUB2 について述べます。
 
-Continuing from before, now that the BIOS has chosen a boot device and transferred control to the boot sector code, execution starts from [boot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/boot.S;hb=HEAD). This code is very simple, due to the limited amount of space available, and contains a pointer which is used to jump to the location of GRUB 2's core image. The core image begins with [diskboot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/diskboot.S;hb=HEAD), which is usually stored immediately after the first sector in the unused space before the first partition. The above code loads the rest of the core image, which contains GRUB 2's kernel and drivers for handling filesystems, into memory. After loading the rest of the core image, it executes [grub_main](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/kern/main.c).
+BIOSはブートデバイスを選んで、ブートセクタコードに対する制御を伝達し、[boot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/boot.S;hb=HEAD)から実行を開始します。
+このコードは、利用可能な空間が限られているため非常にシンプルで、GRUB2 のコアイメージの位置へジャンプするためのポインタを含んでいます。
+コアイメージは [diskboot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/diskboot.S;hb=HEAD) で始まりますが、最初のパーティションの前の未使用のスペースにある最初のセクタの直後に格納されます。
+上記のコードは残りのコアイメージをメモリにロードしますが、それには GRUB2 のカーネルとファイルシステムを取り扱うためのドライバを含んでいます。
+残りのコアイメージをロードした後に、[grub_main](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/kern/main.c)を実行します。
 
-`grub_main` initializes the console, gets the base address for modules, sets the root device, loads/parses the grub configuration file, loads modules, etc. At the end of execution, `grub_main` moves grub to normal mode. `grub_normal_execute` (from `grub-core/normal/main.c`) completes the final preparations and shows a menu to select an operating system. When we select one of the grub menu entries, `grub_menu_execute_entry` runs, executing the grub `boot` command and booting the selected operating system.
+`grub_main` は、コンソールの初期化、モジュールのためのベースアドレスの取得、ルートデバイスの設定、GRUB設定ファイルの ロード/パース、モジュールのロードなどを行います。実行の最後には、`grub_main` がGRUBを通常モードへ移動させます。
+`grub_normal_execute`（grub-core/normal/main.cより）が最後の準備を完了させ、オペレーティングシステムを選択するためのメニューを表示します。
+GRUBメニューを選択する際に、`grub_menu_execute_entry` が起動し、grub`boot`コマンドを実行して、選択したオペレーティングシステムをブートします。
 
-As we can read in the kernel boot protocol, the bootloader must read and fill some fields of the kernel setup header, which starts at the `0x01f1` offset from the kernel setup code. You may look at the boot [linker script](https://github.com/torvalds/linux/blob/master/arch/x86/boot/setup.ld#L16) to make sure in this offset. The kernel header [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S) starts from:
+カーネルのブートプロトコルを見て分かるように、ブートローダはカーネルのセットアップヘッダを読み込み、いくつかのフィールドを満たさなければいけません。
+そしてそれは、カーネルの設定コードのオフセット `0x01f1` から始まります。
+[リンカスクリプト](https://github.com/torvalds/linux/blob/master/arch/x86/boot/setup.ld#L16)を見ることで、このオフセットは確認できます。
+カーネルヘッダ([arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S)) は次のようにスタートします。:
 
 ```assembly
     .globl hdr
@@ -217,12 +242,14 @@ hdr:
     boot_flag:   .word 0xAA55
 ```
 
-The bootloader must fill this and the rest of the headers (which are only marked as being type `write` in the Linux boot protocol, such as in [this example](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L354)) with values which it has either received from the command line or calculated. (We will not go over full descriptions and explanations for all fields of the kernel setup header now but instead when the discuss how kernel uses them; you can find a description of all fields in the [boot protocol](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L156).)
+ブートローダは、これと、（[この例](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L354)のようなLinuxブートプロトコルのwriteでマークされている）残りのヘッダを、コマンドラインまたは計算し求めた値で埋める必要があります。
+(カーネルのセットアップヘッダの全てのフィールドの記述や説明についてはここでは触れませんが、後でカーネルがこれらを使用する時に説明します。)
+[boot protocol](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L156)で全てのフィールドの記述を見つけることができます。
 
-As we can see in the kernel boot protocol, the memory map will be the following after loading the kernel:
+カーネルのブートプロトコルを見て分かるように、メモリマップはカーネルをロードした後、次のようになるでしょう。:
 
 ```shell
-         | Protected-mode kernel  |
+         | Protected-mode カーネル  |
 100000   +------------------------+
          | I/O memory hole        |
 0A0000   +------------------------+
@@ -230,10 +257,10 @@ As we can see in the kernel boot protocol, the memory map will be the following 
          ~                        ~
          | Command line           | (Can also be below the X+10000 mark)
 X+10000  +------------------------+
-         | Stack/heap             | For use by the kernel real-mode code.
+         | Stack/heap             | For use by the カーネル real-mode code.
 X+08000  +------------------------+
-         | Kernel setup           | The kernel real-mode code.
-         | Kernel boot sector     | The kernel legacy boot sector.
+         | Kernel setup           | The カーネル real-mode code.
+         | Kernel boot sector     | The カーネル legacy boot sector.
        X +------------------------+
          | Boot loader            | <- Boot sector entry point 0x7C00
 001000   +------------------------+
@@ -246,24 +273,25 @@ X+08000  +------------------------+
 
 ```
 
-So, when the bootloader transfers control to the kernel, it starts at:
+ブートローダがカーネルに制御を移したとき、以下のアドレスで開始されます。:
 
 ```
 X + sizeof(KernelBootSector) + 1
 ```
 
-where `X` is the address of the kernel boot sector being loaded. In my case, `X` is `0x10000`, as we can see in a memory dump:
+`X` がカーネルのブートセクタがロードされている位置を示します。この場合は、`X` が `0x10000` で、メモリダンプに見て取れます。:
 
 ![kernel first address](http://oi57.tinypic.com/16bkco2.jpg)
 
-The bootloader has now loaded the Linux kernel into memory, filled the header fields, and then jumped to the corresponding memory address. We can now move directly to the kernel setup code.
+ブートローダーはLinuxカーネルをメモリへロードし、ヘッダのフィールドを埋め、該当のメモリアドレスへジャンプします。
+今、われわれはカーネルのセットアップコードへ直接移動することができます。
 
 Kernelの設定を始める
 --------------------------------------------------------------------------------
 
-Finally, we are in the kernel! Technically, the kernel hasn't run yet; first, we need to set up the kernel, memory manager, process manager, etc. Kernel setup execution starts from [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S) at [_start](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L293). It is a little strange at first sight, as there are several instructions before it.
+Finally, we are in the カーネル! Technically, the カーネル hasn't run yet; first, we need to set up the カーネル, memory manager, process manager, etc. Kernel setup execution starts from [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S) at [_start](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L293). It is a little strange at first sight, as there are several instructions before it.
 
-A long time ago, the Linux kernel used to have its own bootloader. Now, however, if you run, for example,
+A long time ago, the Linux カーネル used to have its own bootloader. Now, however, if you run, for example,
 
 ```
 qemu-system-x86_64 vmlinuz-3.18-generic
@@ -291,7 +319,7 @@ pe_header:
 
 It needs this to load an operating system with [UEFI](https://en.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface). We won't be looking into its inner workings right now and will cover it in upcoming chapters.
 
-The actual kernel setup entry point is:
+The actual カーネル setup entry point is:
 
 ```assembly
 // header.S line 292
@@ -310,7 +338,7 @@ The bootloader (grub2 and others) knows about this point (`0x200` offset from `M
 .bsdata : { *(.bsdata) }
 ```
 
-The kernel setup entry point is:
+The カーネル setup entry point is:
 
 ```assembly
     .globl _start
@@ -325,7 +353,7 @@ _start:
 
 Here we can see a `jmp` instruction opcode (`0xeb`) that jumps to the `start_of_setup-1f` point. In `Nf` notation, `2f` refers to the following local `2:` label; in our case, it is label `1` that is present right after the jump, and it contains the rest of the setup [header](https://github.com/torvalds/linux/blob/master/Documentation/x86/boot.txt#L156). Right after the setup header, we see the `.entrytext` section, which starts at the `start_of_setup` label.
 
-This is the first code that actually runs (aside from the previous jump instructions, of course). After the kernel setup received control from the bootloader, the first `jmp` instruction is located at the `0x200` offset from the start of the kernel real mode, i.e., after the first 512 bytes. This we can both read in the Linux kernel boot protocol and see in the grub2 source code:
+This is the first code that actually runs (aside from the previous jump instructions, of course). After the カーネル setup received control from the bootloader, the first `jmp` instruction is located at the `0x200` offset from the start of the カーネル real mode, i.e., after the first 512 bytes. This we can both read in the Linux カーネル boot protocol and see in the grub2 source code:
 
 ```C
 segment = grub_linux_real_target >> 4;
@@ -333,16 +361,16 @@ state.gs = state.fs = state.es = state.ds = state.ss = segment;
 state.cs = segment + 0x20;
 ```
 
-This means that segment registers will have the following values after kernel setup starts:
+This means that segment registers will have the following values after カーネル setup starts:
 
 ```
 gs = fs = es = ds = ss = 0x1000
 cs = 0x1020
 ```
 
-In my case, the kernel is loaded at `0x10000`.
+In my case, the カーネル is loaded at `0x10000`.
 
-After the jump to `start_of_setup`, the kernel needs to do the following:
+After the jump to `start_of_setup`, the カーネル needs to do the following:
 
 * Make sure that all segment register values are equal
 * Set up a correct stack, if needed
@@ -355,7 +383,7 @@ Let's look at the implementation.
 セグメントレジスタのアライメント
 --------------------------------------------------------------------------------
 
-First of all, the kernel ensures that `ds` and `es` segment registers point to the same address. Next, it clears the direction flag using the `cld` instruction:
+First of all, the カーネル ensures that `ds` and `es` segment registers point to the same address. Next, it clears the direction flag using the `cld` instruction:
 
 ```assembly
     movw    %ds, %ax
@@ -363,7 +391,7 @@ First of all, the kernel ensures that `ds` and `es` segment registers point to t
     cld
 ```
 
-As I wrote earlier, grub2 loads kernel setup code at address `0x10000` and `cs` at `0x1020` because execution doesn't start from the start of file, but from
+As I wrote earlier, grub2 loads カーネル setup code at address `0x10000` and `cs` at `0x1020` because execution doesn't start from the start of file, but from
 
 ```assembly
 _start:
@@ -494,9 +522,9 @@ main関数へのジャンプ
 まとめ
 --------------------------------------------------------------------------------
 
-これで、Linux kernek insidesの最初のパートは終わりです。
+これで、Linux カーネル insidesの最初のパートは終わりです。
 もし質問や提案があれば twitter [0xAX](https://twitter.com/0xAX) や [email](anotherworldofworld@gmail.com) で連絡していただくか、Issueを作成してください。
-次のパートでは、Linux kernelの設定で実行する最初の`Cコード`、`memset`、`memcpy`、`earlyprintk`の実装といったメモリルーチンの実装、初期のコンソールの実装と初期化などを見ていく予定です。
+次のパートでは、Linux カーネルの設定で実行する最初の`Cコード`、`memset`、`memcpy`、`earlyprintk`の実装といったメモリルーチンの実装、初期のコンソールの実装と初期化などを見ていく予定です。
 
 リンク
 --------------------------------------------------------------------------------
@@ -507,7 +535,7 @@ main関数へのジャンプ
   * [80386](http://en.wikipedia.org/wiki/Intel_80386)
   * [Reset vector](http://en.wikipedia.org/wiki/Reset_vector)
   * [Real mode](http://en.wikipedia.org/wiki/Real_mode)
-  * [Linux kernel boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt)
+  * [Linux カーネル boot protocol](https://www.カーネル.org/doc/Documentation/x86/boot.txt)
   * [CoreBoot developer manual](http://www.coreboot.org/Developer_Manual)
   * [Ralf Brown's Interrupt List](http://www.ctyme.com/intr/int.htm)
   * [Power supply](http://en.wikipedia.org/wiki/Power_supply)
