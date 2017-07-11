@@ -1,14 +1,19 @@
 Control Groups
 ================================================================================
 
-Introduction
+はじめに
 --------------------------------------------------------------------------------
 
-This is the first part of the new chapter of the [linux insides](http://0xax.gitbooks.io/linux-insides/content/) book and as you may guess by part's name - this part will cover [control groups](https://en.wikipedia.org/wiki/Cgroups) or `cgroups` mechanism in the Linux kernel.
+これは、[linux insides](http://0xax.gitbooks.io/linux-insides/content/)の新しい章の最初のパートです。
+パートの名前からあなたが予想したとおり、このパートではLinuxカーネル内での [control groups](https://en.wikipedia.org/wiki/Cgroups) や `cgroups`の仕組みを扱います。
 
-`Cgroups` are special mechanism provided by the Linux kernel which allows us to allocate kind of `resources` like processor time, number of processes per group, amount of memory per control group or combination of such resources for a process or set of processes. `Cgroups` are organized hierarchically and here this mechanism is similar to usual processes as they are hierarchical too and child `cgroups` inherit set of certain parameters from their parents. But actually they are not the same. The main differences between `cgroups` and normal processes that many different hierarchies of control groups may exist simultaneously in one time while normal process tree is always single. This was not a casual step because each control group hierarchy is attached to set of control group `subsystems`.
+`Cgroups` はLinuxカーネルが提供する特別な仕組みであり、プロセスやプロセスの集合に対して、プロセッサ時間、グループあたりのプロセス数、コントロールグループあたりのメモリ量、またはそのようなリソースの組み合わせなどに対して `リソース` の種類を割り当てることができます。 
+`Cgroups`は階層的に構成されています。仕組みは通常のプロセスと似ていて、階層的であるため、子の`cgroups`は親から特定のパラメータの集合を継承します。
+しかし、実際には同じではありません。`cgroups` と通常のプロセスの主な違いは、通常のプロセスツリーは常に単一であるが、コントロールグループでは多くの異なる階層が同時に存在する可能性があるということです。 
+各コントロールグループの階層が`サブシステム`のコントロールグループに関連付けられているため、単純なステップではありませんでした。
 
-One `control group subsystem` represents one kind of resources like a processor time or number of [pids](https://en.wikipedia.org/wiki/Process_identifier) or in other words number of processes for a `control group`. Linux kernel provides support for following twelve `control group subsystems`:
+ある `control group subsystem` はプロセッサ時間、または [pids](https://en.wikipedia.org/wiki/Process_identifier) の数や、言い換えるなら、`control group` のプロセス数を表します。
+Linux カーネルは以下の12の `control group subsystems` のサポートを提供しています:
 
 * `cpuset` - assigns individual processor(s) and memory nodes to task(s) in a group;
 * `cpu` - uses the scheduler to provide cgroup tasks access to the processor resources;
@@ -23,11 +28,14 @@ One `control group subsystem` represents one kind of resources like a processor 
 * `hugetlb` - activates support for [huge pages](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt) for a group;
 * `pid` - sets limit to number of processes in a group.
 
-Each of these control group subsystems depends on related configuration option. For example the `cpuset` subsystem should be enabled via `CONFIG_CPUSETS` kernel configuration option, the `io` subsystem via `CONFIG_BLK_CGROUP` kernel configuration option and etc. All of these kernel configuration options may be found in the `General setup → Control Group support` menu:
+コントロールグループのサブシステムは関連する設定オプションに依存します。 
+例えば、 `cpuset` サブシステムはカーネル設定オプションの`CONFIG_CPUSETS`、
+`io`サブシステムはカーネル設定オプションの `CONFIG_BLK_CGROUP` を介して有効にする必要があります。
+すべてのカーネルの設定のオプションは`General setup → Control Group support`で見つかるでしょう:
 
 ![menuconfig](http://oi66.tinypic.com/2rc2a9e.jpg)
 
-You may see enabled control groups on your computer via [proc](https://en.wikipedia.org/wiki/Procfs) filesystem:
+あなたのコンピュータで有効なコントロールグループを[proc](https://en.wikipedia.org/wiki/Procfs)ファイルシステムで見ることができるでしょう:
 
 ```
 $ cat /proc/cgroups 
@@ -46,7 +54,7 @@ hugetlb	10	1	1
 pids	5	69	1
 ```
 
-or via [sysfs](https://en.wikipedia.org/wiki/Sysfs):
+または、[sysfs](https://en.wikipedia.org/wiki/Sysfs):
 
 ```
 $ ls -l /sys/fs/cgroup/
@@ -68,13 +76,15 @@ dr-xr-xr-x 5 root root  0 Dec  2 22:37 pids
 dr-xr-xr-x 5 root root  0 Dec  2 22:37 systemd
 ```
 
-As you already may guess that `control groups` mechanism is not such mechanism which was invented only directly to the needs of the Linux kernel, but mostly for userspace needs. To use a `control group`, we should create it at first. We may create a `cgroup` via two ways.
+すでに、あなたは `control groups`メカニズムは、Linuxカーネルのニーズに直接的に開発された仕組みでなく、
+主にユーザー空間のニーズに対して開発されたものだと勘づいているかもしれません。
+`control groups`を使うには、最初に作成するべきです。私たちは二つの方法で `cgroup`を作成するでしょう。
 
-The first way is to create subdirectory in any subsystem from `sys/fs/cgroup` and add a pid of a task to a `tasks` file which will be created automatically right after we will create the subdirectory.
+最初の方法は、`sys/fs/cgroup` からサブディレクトリを作成し、サブディレクトリを作成した直後に自動的に作成される `tasks`ファイルにタスクのpidを追加することです。
 
-The second way is to create/destroy/manage `cgroups` with utils from `libcgroup` library (`libcgroup-tools` in Fedora).
+2番目の方法は `libcgroup`ライブラリ（Fedoraの`libcgroup-tools`）のutilを使って `cgroups`を作成/破壊/管理する方法です。
 
-Let's consider simple example. Following [bash](https://www.gnu.org/software/bash/) script will print a line to `/dev/tty` device which represents control terminal for the current process:
+シンプルな例を考えてみましょう。 以下の[bash](https://www.gnu.org/software/bash/)スクリプトは、現在のプロセスの制御端末を表す `/dev/tty`デバイスに出力します：
 
 ```shell
 #!/bin/bash
@@ -86,7 +96,7 @@ do
 done
 ```
 
-So, if we will run this script we will see following result:
+このスクリプトを走らせ、結果を見ましょう:
 
 ```
 $ sudo chmod +x cgroup_test_script.sh
@@ -99,25 +109,26 @@ print line
 ...
 ```
 
-Now let's go to the place where `cgroupfs` is mounted on our computer. As we just saw, this is `/sys/fs/cgroup` directory, but you may mount it everywhere you want.
+`cgroupfs`がマウントされる場所を見てみましょう。 
+見たとおり、これは `/sys/fs/cgroup` ディレクトリですが、あなたがマウントしたい場所にマウント出来ます。
 
 ```
 $ cd /sys/fs/cgroup
 ```
 
-And now let's go to the `devices` subdirectory which represents kind of resources that allows or denies access to devices by tasks in a `cgroup`:
+`cgroup`のタスクによってデバイスへのアクセスを許可/拒否するリソースの種類を表す `devices`サブディレクトリに行きましょう。:
 
 ```
 # cd /devices
 ```
 
-and create `cgroup_test_group` directory there:
+`cgroup_test_group`ディレクトリを作ります:
 
 ```
 # mkdir cgroup_test_group
 ```
 
-After creation of the `cgroup_test_group` directory, following files will be generated there:
+`cgroup_test_group`ディレクトリの作成直後に、以下のファイルが生成されるでしょう:
 
 ```
 /sys/fs/cgroup/devices/cgroup_test_group$ ls -l
@@ -131,20 +142,29 @@ total 0
 -rw-r--r-- 1 root root 0 Dec  3 22:55 tasks
 ```
 
-For this moment we are interested in `tasks` and `devices.deny` files. The first `tasks` files should contain pid(s) of processes which will be attached to the `cgroup_test_group`. The second `devices.deny` file contain list of denied devices. By default a newly created group has no any limits for devices access. To forbid a device (in our case it is `/dev/tty`) we should write to the `devices.deny` following line:
+この瞬間、`tasks`と` devices.deny`ファイルに興味が湧きます。
+最初の `tasks`ファイルには、`cgroup_test_group`に付加されるプロセスのpid(s)が含まれていなければなりません。
+2番目の `devices.deny`ファイルには、拒否されたデバイスのリストが含まれています。
+デフォルトでは、新しく作成されたグループにはデバイスアクセスの制限がありません。
+デバイスを禁止するには（この場合は `/dev/tty`）、以下の行に`devices.deny`を書きこみます:
 
 ```
 # echo "c 5:0 w" > devices.deny
 ```
 
-Let's go step by step through this line. The first `c` letter represents type of a device. In our case the `/dev/tty` is `char device`. We can verify this from output of `ls` command:
+この行を1行1行見ていきましょう。最初の`c`はデバイスの種類を表します。
+このケースでは、`/dev/tty`は`char device`です。`ls`コマンドの出力からこれを確認できます:
 
 ```
 ~$ ls -l /dev/tty
 crw-rw-rw- 1 root tty 5, 0 Dec  3 22:48 /dev/tty
 ```
 
-see the first `c` letter in a permissions list. The second part is `5:0` is minor and major numbers of the device. You can see these numbers in the output of `ls` too. And the last `w` letter forbids tasks to write to the specified device. So let's start the `cgroup_test_script.sh` script:
+パーミッションリストの最初の`c`を見てください。
+2番目の部分は`5:0`で、これはデバイスのマイナー番号とメジャー番号です。
+これらの数字は`ls`の出力でも見ることができます。
+最後の`w`は指定されたデバイスに書き込む作業を禁じます。
+それでは、cgroup_test_script.shスクリプトを開始しましょう:
 
 ```
 ~$ ./cgroup_test_script.sh 
@@ -155,13 +175,13 @@ print line
 ...
 ```
 
-and add pid of this process to the `devices/tasks` file of our group:
+そしてこのプロセスのpidを私たちのグループの`devices/tasks`ファイルに付け足します:
 
 ```
 # echo $(pidof -x cgroup_test_script.sh) > /sys/fs/cgroup/devices/cgroup_test_group/tasks
 ```
 
-The result of this action will be as expected:
+結果は予想どおりになります:
 
 ```
 ~$ ./cgroup_test_script.sh 
@@ -174,7 +194,8 @@ print line
 ./cgroup_test_script.sh: line 5: /dev/tty: Operation not permitted
 ```
 
-Similar situation will be when you will run you [docker](https://en.wikipedia.org/wiki/Docker_(software)) containers for example:
+Similar situation will be when you will run you [docker](https://en.wikipedia.org/wiki/Docker_(software)) containers for example
+同様の状況として[docker](https://en.wikipedia.org/wiki/Docker_(software))コンテナを実行するときを例に挙げられます:
 
 ```
 ~$ docker ps
@@ -190,7 +211,8 @@ fa2d2085cd1c        mariadb:10          "docker-entrypoint..."   12 days ago    
 ...
 ```
 
-So, during startup of a `docker` container, `docker` will create a `cgroup` for processes in this container:
+So, during startup of a `docker` container, `docker` will create a `cgroup` for processes in this container
+`docker` コンテナの起動時に、`docker`はコンテナ内のプロセスのために`cgroup`を作成します:
 
 ```
 $ docker exec -it mysql-work /bin/bash
@@ -198,7 +220,7 @@ $ top
  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND                                                                                   1 mysql     20   0  963996 101268  15744 S   0.0  0.6   0:00.46 mysqld                                                                                  71 root      20   0   20248   3028   2732 S   0.0  0.0   0:00.01 bash                                                                                    77 root      20   0   21948   2424   2056 R   0.0  0.0   0:00.00 top                                                                                  
 ```
 
-And we may see this `cgroup` on host machine:
+ホストマシンの`cgroup`を見られるかもしれません:
 
 ```C
 $ systemd-cgls
@@ -211,9 +233,10 @@ Control group /:
 │   └─6404 /bin/bash
 ```
 
-Now we know a little about `control groups` mechanism, how to use it manually and what's purpose of this mechanism. Time to look inside of the Linux kernel source code and start to dive into implementation of this mechanism.
+これで、われわれは、`control group`の仕組み、手動での使用方法、この仕組みの目的について少し分かりました。
+Linuxカーネルのソースコードを見て、この仕組みの実装を深く見ていきます。
 
-Early initialization of control groups
+コントロールグループの早期の初期化
 --------------------------------------------------------------------------------
 
 Now after we just saw little theory about `control groups` Linux kernel mechanism, we may start to dive into the source code of Linux kernel to acquainted with this mechanism closer. As always we will start from the initialization of `control groups`. Initialization of `cgroups` divided into two parts in the Linux kernel: early and late. In this part we will consider only `early` part and `late` part will be considered in next parts.
@@ -422,16 +445,18 @@ The `cgroup_init_subsys` function does initialization of the given subsystem wit
 
 That's all. From this moment early subsystems are initialized.
 
-Conclusion
+まとめ
 --------------------------------------------------------------------------------
 
-It is the end of the first part which describes introduction into `Control groups` mechanism in the Linux kernel. We covered some theory and the first steps of initialization of stuffs related to `control groups` mechanism. In the next part we will continue to dive into the more practical aspects of `control groups`.
+これでLinuxカーネルの`Control groups`の仕組みについての最初のパートは終わりです。
+`control groups`の仕組みに関連する初期化の最初のステップと理論を見てきました。
+次のパートでは、`control groups`の実践的な側面を見ていこうと思います。
 
-If you have any questions or suggestions write me a comment or ping me at [twitter](https://twitter.com/0xAX).
+もし質問や提案があれば [twitter](https://twitter.com/0xAX)で連絡してください。
 
-**Please note that English is not my first language, And I am really sorry for any inconvenience. If you find any mistakes please send me a PR to [linux-insides](https://github.com/0xAX/linux-insides).**
+**英語が私の母国語ではないことに留意してください、ご迷惑をおかけして申し訳ありません。 もし、何か間違いが見つかった場合は、[linux-insides](https://github.com/0xAX/linux-insides)にPRを送ってください**
 
-Links
+リンク
 --------------------------------------------------------------------------------
 
 * [control groups](https://en.wikipedia.org/wiki/Cgroups)

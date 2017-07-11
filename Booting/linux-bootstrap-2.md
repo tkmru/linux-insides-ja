@@ -1,10 +1,11 @@
 Kernel booting process. Part 2.
 ================================================================================
 
-First steps in the kernel setup
+カーネルセットアップの最初のステップ
 --------------------------------------------------------------------------------
 
-We started to dive into linux kernel insides in the previous [part](linux-bootstrap-1.md) and saw the initial part of the kernel setup code. We stopped at the first call to the `main` function (which is the first function written in C) from [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c).
+We started to dive into linux kernel insides in the previous [part](linux-bootstrap-1.md) and saw the initial part of the kernel setup code. 
+We stopped at the first call to the `main` function (which is the first function written in C) from [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c).
 
 In this part we will continue to research the kernel setup code and
 * see what `protected mode` is,
@@ -15,7 +16,7 @@ In this part we will continue to research the kernel setup code and
 
 So, Let's go ahead.
 
-Protected mode
+プロテクトモード
 --------------------------------------------------------------------------------
 
 Before we can move to the native Intel64 [Long Mode](http://en.wikipedia.org/wiki/Long_mode), the kernel must switch the CPU into protected mode.
