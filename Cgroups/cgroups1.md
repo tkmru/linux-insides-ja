@@ -194,7 +194,6 @@ print line
 ./cgroup_test_script.sh: line 5: /dev/tty: Operation not permitted
 ```
 
-Similar situation will be when you will run you [docker](https://en.wikipedia.org/wiki/Docker_(software)) containers for example
 同様の状況として[docker](https://en.wikipedia.org/wiki/Docker_(software))コンテナを実行するときを例に挙げられます:
 
 ```
@@ -211,7 +210,6 @@ fa2d2085cd1c        mariadb:10          "docker-entrypoint..."   12 days ago    
 ...
 ```
 
-So, during startup of a `docker` container, `docker` will create a `cgroup` for processes in this container
 `docker` コンテナの起動時に、`docker`はコンテナ内のプロセスのために`cgroup`を作成します:
 
 ```
