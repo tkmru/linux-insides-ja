@@ -9,24 +9,24 @@ Control Groups
 
 `Cgroups` はLinuxカーネルが提供する特別な仕組みであり、プロセスやプロセスの集合に対して、プロセッサ時間、グループあたりのプロセス数、コントロールグループあたりのメモリ量、またはそのようなリソースの組み合わせなどに対して `リソース` の種類を割り当てることができます。 
 `Cgroups`は階層的に構成されています。仕組みは通常のプロセスと似ていて、階層的であるため、子の`cgroups`は親から特定のパラメータの集合を継承します。
-しかし、実際には同じではありません。`cgroups` と通常のプロセスの主な違いは、通常のプロセスツリーは常に単一であるが、コントロールグループでは多くの異なる階層が同時に存在する可能性があるということです。 
-各コントロールグループの階層が`サブシステム`のコントロールグループに関連付けられているため、単純なステップではありませんでした。
+しかし、実際には同じではありません。`cgroups` と通常のプロセスの主な違いは、通常のプロセスツリーは常に単一でありますが、コントロールグループでは多くの異なる階層が同時に存在する可能性があるということです。 
+各コントロールグループの階層が`サブシステム`のコントロールグループに関連付けられているため、単純なステップではありません。
 
 ある `control group subsystem` はプロセッサ時間、または [pids](https://en.wikipedia.org/wiki/Process_identifier) の数や、言い換えるなら、`control group` のプロセス数を表します。
 Linux カーネルは以下の12の `control group subsystems` のサポートを提供しています:
 
-* `cpuset` - assigns individual processor(s) and memory nodes to task(s) in a group;
-* `cpu` - uses the scheduler to provide cgroup tasks access to the processor resources;
-* `cpuacct` - generates reports about processor usage by a group;
-* `io` - sets limit to read/write from/to [block devices](https://en.wikipedia.org/wiki/Device_file);
-* `memory` - sets limit on memory usage by a task(s) from a group;
-* `devices` - allows access to devices by a task(s) from a group;
-* `freezer` - allows to suspend/resume for a task(s) from a group;
-* `net_cls` - allows to mark network packets from task(s) from a group;
-* `net_prio` - provides a way to dynamically set the priority of network traffic per network interface for a group;
-* `perf_event` - provides access to [perf events](https://en.wikipedia.org/wiki/Perf_(Linux)) to a group;
-* `hugetlb` - activates support for [huge pages](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt) for a group;
-* `pid` - sets limit to number of processes in a group.
+* `cpuset` - 個々のプロセッサ（たち）とメモリノードをグループ内のタスク（たち）に割り当てます。
+* `cpu` - プロセッサの資源へcgroupタスクのアクセスを提供するためにスケジューラを使用します。
+* `cpuacct` - グループによるプロセッサ使用状況に関するレポートを生成します。
+* `io` - [block devices](https://en.wikipedia.org/wiki/Device_file)からの読み取り/への書き込みの制限を設定します。
+* `memory` - グループからのタスク（たち）によるメモリ使用制限を設定します。
+* `devices` - グループからのタスク（たち）によってデバイスへのアクセスを許可します。
+* `freezer` - グループからのタスク（たち）の中断/再開を許可します。
+* `net_cls` - グループからのタスク（たち）からのネットワークパケットをマークすることを許可します。
+* `net_prio` - グループのネットワークインタフェース毎のネットワークトラフィックの優先度を動的に設定する方法を提供します。
+* `perf_event` - グループに[perf events](https://en.wikipedia.org/wiki/Perf_(Linux))へのアクセスを提供します。
+* `hugetlb` - グループの[huge pages](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)をサポートを有効にします。
+* `pid` - グループ内のプロセス数に制限を設定します。
 
 コントロールグループのサブシステムは関連する設定オプションに依存します。 
 例えば、 `cpuset` サブシステムはカーネル設定オプションの`CONFIG_CPUSETS`、
@@ -54,7 +54,7 @@ hugetlb	10	1	1
 pids	5	69	1
 ```
 
-または、[sysfs](https://en.wikipedia.org/wiki/Sysfs):
+または、[sysfs](https://en.wikipedia.org/wiki/Sysfs)で見ることができるでしょう:
 
 ```
 $ ls -l /sys/fs/cgroup/
@@ -237,15 +237,18 @@ Linuxカーネルのソースコードを見て、この仕組みの実装を深
 コントロールグループの早期の初期化
 --------------------------------------------------------------------------------
 
-Now after we just saw little theory about `control groups` Linux kernel mechanism, we may start to dive into the source code of Linux kernel to acquainted with this mechanism closer. As always we will start from the initialization of `control groups`. Initialization of `cgroups` divided into two parts in the Linux kernel: early and late. In this part we will consider only `early` part and `late` part will be considered in next parts.
+`control groups`のLinuxカーネルの仕組みに関する少しの理論を見ただけで、Linuxカーネルのソースコードを知ることができます。
+いつものように、私たちは `control groups`の初期化から始めます。
+`cgroups`の初期化は、Linuxカーネルの「早期」と「末期」の2つの部分に分かれています。 この部分では、「早期」と「末期」の部分のみが次の章で考慮されると考えます。
 
-Early initialization of `cgroups` starts from the call of the:
+`cgroups`の早期の初期化は次の関数を呼ぶことから始まります:
 
 ```C
 cgroup_init_early();
 ```
 
-function in the [init/main.c](https://github.com/torvalds/linux/blob/master/init/main.c) during early initialization of the Linux kernel. This function is defined in the [kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c) source code file and starts from the definition of two following local variables:
+Linuxカーネルの早期の初期化の間に[init/main.c](https://github.com/torvalds/linux/blob/master/init/main.c)の中の関数を実行してください。
+この関数は、[kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c)のソース内で定義され、次の2つのローカル変数の定義から始まります:
 
 ```C
 int __init cgroup_init_early(void)
@@ -258,7 +261,7 @@ int __init cgroup_init_early(void)
 }
 ```
 
-The `cgroup_sb_opts` structure defined in the same source code file and looks:
+`cgroup_sb_opts`構造体は同じソース内で定義されていて、以下のように見えます:
 
 ```C
 struct cgroup_sb_opts {
@@ -271,13 +274,15 @@ struct cgroup_sb_opts {
 };
 ```
 
-which represents mount options of `cgroupfs`. For example we may create named cgroup hierarchy (with name `my_cgrp`) with the `name=` option and without any subsystems:
+
+これは `cgroupfs` のマウントオプションを表します。
+例えば、以下のコマンドは`name =`オプションを持ち、サブシステムを持たないnamed cgroup hierarchy（名前は `my_cgrp`）を作成します:
 
 ```
 $ mount -t cgroup -oname=my_cgrp,none /mnt/cgroups
 ```
 
-The second variable - `ss` has type - `cgroup_subsys` structure which is defined in the [include/linux/cgroup-defs.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup-defs.h) header file and as you may guess from the name of the type, it represents a `cgroup` subsystem. This structure contains various fields and callback functions like:
+2番目の変数 `ss`は、[include/linux/cgroup-defs.h](https://github.com/torvalds/linux/blob/master/include/linuxblob/master/include/linux/cgroup-defs.h)で定義されているタイプの `cgroup_subsys`構造体を持っています。 ヘッダファイルを参照し、タイプの名前から推測できるように、 `cgroup`サブシステムを表します。 この構造体には、次のようなさまざまなフィールドとコールバック関数が含まれています。:
 
 ```C
 struct cgroup_subsys {
@@ -296,24 +301,38 @@ struct cgroup_subsys {
 }
 ```
 
-Where for example `ccs_online` and `ccs_offline` callbacks are called after a cgroup successfully will complete all allocations and a cgroup will be before releasing respectively. The `early_init` flags marks subsystems which may/should be initialized early. The `id` and `name` fields represents unique identifier in the array of registered subsystems for a cgroup and `name` of a subsystem respectively. The last - `root` fields represents pointer to the root of of a cgroup hierarchy.
+`ccs_online`と`ccs_offline`コールバックが呼び出されると、cgroupが正常に終了した後、すべての割り当てが完了し、cgroupは解放されます。
+`early_init`フラグは、早期に初期化されるかもしれない/初期化されるべきサブシステムを示す。
+`id`フィールドと`name`フィールドは、それぞれcgroupの登録されたサブシステムの配列内のユニークな識別子とサブシステムの`name`を表します。 最後の - `root`フィールドは、cgroupの階層のルートへのポインタを表します。
 
-Of course the `cgroup_subsys` structure bigger and has other fields, but it is enough for now. Now as we got to know important structures related to `cgroups` mechanism, let's return to the `cgroup_init_early` function. Main purpose of this function is to do early initialization of some subsystems. As you already may guess, these `early` subsystems should have `cgroup_subsys->early_init = 1`. Let's look what subsystems may be initialized early.
+もちろん `cgroup_subsys` 構造体は大きく、他のフィールドもありますが、今は十分です。
+`cgroups` メカニズムに関連する重要な構造を知るようになったので、`cgroup_init_early` 関数に戻りましょう。
+この関数の主な目的は、いくつかのサブシステムの早期初期化を行うことです。 
+あなたがすでに想像しているように、これらの初期のサブシステムは `cgroup_subsys -> early_init = 1`を持つべきです。
+早期に初期化されるサブシステムを見てみましょう。
 
-After the definition of the two local variables we may see following lines of code:
+2つのローカル変数を定義した後に、次のコード行を見れます:
 
 ```C
 init_cgroup_root(&cgrp_dfl_root, &opts);
 cgrp_dfl_root.cgrp.self.flags |= CSS_NO_REF;
 ```
 
-Here we may see call of the `init_cgroup_root` function which will execute initialization of the default unified hierarchy and after this we set `CSS_NO_REF` flag in state of this default `cgroup` to disable reference counting for this css. The `cgrp_dfl_root` is defined in the same source code file:
+ここでは、デフォルトの統一された階層の初期化を実行する `init_cgroup_root` 関数の呼び出しを見ることができます。
+この後、このデフォルトの`cgroup`の状態で `CSS_NO_REF`フラグをセットしてこのcssの参照カウントを無効にします。
+`cgrp_dfl_root`は同じソースコードファイルで定義されています:
 
 ```C
 struct cgroup_root cgrp_dfl_root;
 ```
 
-Its `cgrp` field represented by the `cgroup` structure which represents a `cgroup` as you already may guess and defined in the [include/linux/cgroup-defs.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup-defs.h) header file. We already know that a process which is represented by the `task_struct` in the Linux kernel. The `task_struct` does not contain direct link to a `cgroup` where this task is attached. But it may be reached via `ccs_set` field of the `task_struct`. This `ccs_set` structure holds pointer to the array of subsystem states:
+その `cgrp`フィールドは`cgroup`構造体によってを表されます。
+これは[include/linux/cgroup-defs.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup-defs.h)内で定義されます。
+われわれは、Linuxカーネルの `task_struct`で表されるプロセスをすでに知っています。
+`task_struct`はこのタスクがついている`cgroup`への直接リンクを含んでいません。
+しかし、`task_struct`の`ccs_set`フィールドを通してそれを知ることができます。
+この `ccs_set`構造体は、サブシステム状態の配列へのポインタを保持します:
+
 
 ```C
 struct css_set {
@@ -327,7 +346,7 @@ struct css_set {
 }
 ```
 
-And via the `cgroup_subsys_state`, a process may get a `cgroup` that this process is attached to:
+そして、`cgroup_subsys_state`を通して、プロセスはアタッチする`cgroup`を取得できます:
 
 ```C
 struct cgroup_subsys_state {
@@ -341,7 +360,7 @@ struct cgroup_subsys_state {
 }
 ```
 
-So, the overall picture of `cgroups` related data structure is following:
+以下は`cgroups`に関連する構造体の全体像です。:
 
 ```                                                 
 +-------------+         +---------------------+    +------------->+---------------------+          +----------------+
@@ -378,14 +397,15 @@ So, the overall picture of `cgroups` related data structure is following:
 ```
 
 
-
-So, the `init_cgroup_root` fills the `cgrp_dfl_root` with the default values. The next thing is assigning initial `ccs_set` to the `init_task` which represents first process in the system:
+`init_cgroup_root`は`cgrp_dfl_root`をデフォルト値で埋めます。
+次に、システムの最初のプロセスを表す `init_task`に最初の`ccs_set`を割り当てます。:
 
 ```C
 RCU_INIT_POINTER(init_task.cgroups, &init_css_set);
 ```
 
-And the last big thing in the `cgroup_init_early` function is initialization of `early cgroups`. Here we go over all registered subsystems and assign unique identity number, name of a subsystem and call the `cgroup_init_subsys` function for subsystems which are marked as early:
+そして、`cgroup_init_early`関数の最後の大きなことは`early cgroups`の初期化です。
+ここでは、すべての登録されたサブシステムを調べ、一意の識別番号、サブシステムの名前を割り当て、早期にマークされたサブシステムのために `cgroup_init_subsys`関数を呼び出します。:
 
 ```C
 for_each_subsys(ss, i) {
@@ -397,7 +417,8 @@ for_each_subsys(ss, i) {
 }
 ```
 
-The `for_each_subsys` here is a macro which is defined in the [kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c) source code file and just expands to the `for` loop over `cgroup_subsys` array. Definition of this array may be found in the same source code file and it looks in a little unusual way:
+ここの`for_each_subsys`は、[kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c)で定義されているマクロです。`cgroup_subsys`配列に対する`for`ループです。
+この配列の定義は、同じファイルにありますが、それは少し奇妙です:
 
 ```C
 #define SUBSYS(_x) [_x ## _cgrp_id] = &_x ## _cgrp_subsys,
@@ -407,7 +428,9 @@ The `for_each_subsys` here is a macro which is defined in the [kernel/cgroup.c](
 #undef SUBSYS
 ```
 
-It is defined as `SUBSYS` macro which takes one argument (name of a subsystem) and defines `cgroup_subsys` array of cgroup subsystems. Additionally we may see that the array is initialized with content of the [linux/cgroup_subsys.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup_subsys.h) header file. If we will look inside of this header file we will see again set of the `SUBSYS` macros with the given subsystems names:
+1つの引数（サブシステムの名前）をとり、cgroupサブシステムの `cgroup_subsys`配列を定義する`SUBSYS`マクロとして定義されています。
+それに加えて、配列が[linux/cgroup_subsys.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup_subsys.h)ヘッダーファイルの内容で初期化されていることがわかります。
+このヘッダーファイルを見てみると、指定されたサブシステムの名前を持つ`SUBSYS`マクロのセットが再び表示されます:
 
 ```C
 #if IS_ENABLED(CONFIG_CPUSETS)
@@ -422,7 +445,11 @@ SUBSYS(cpu)
 ...
 ```
 
-This works because of `#undef` statement after first definition of the `SUBSYS` macro. Look at the `&_x ## _cgrp_subsys` expression. The `##` operator concatenates right and left expression in a `C` macro. So as we passed `cpuset`, `cpu` and etc., to the `SUBSYS` macro, somewhere `cpuset_cgrp_subsys`, `cp_cgrp_subsys` should be defined. And that's true. If you will look in the [kernel/cpuset.c](https://github.com/torvalds/linux/blob/master/kernel/cpuset.c) source code file, you will see this definition:
+これは、`SUBSYS`マクロを最初に定義した後の`#undef`文のために働きます。
+`&_x ## _cgrp_subsys`式を見てください。 `##`演算子は、`C`マクロの右と左の式を連結します。
+`cpuset`、`cpu`などを `SUBSYS`マクロに渡すと、`cpuset_cgrp_subsys`、`cp_cgrp_subsys`のどこかを定義する必要があります。
+それは本当です。[kernel/cpuset.c](https://github.com/torvalds/linux/blob/master/kernel/cpuset.c)のソースコードファイルを見ると、次のように定義されています。:
+
 
 ```C
 struct cgroup_subsys cpuset_cgrp_subsys = {
@@ -433,15 +460,17 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 };
 ```
 
-So the last step in the `cgroup_init_early` function is initialization of early subsystems with the call of the `cgroup_init_subsys` function. Following early subsystems will be initialized:
+したがって、`cgroup_init_early`関数の最後のステップでは、`cgroup_init_subsys`関数を呼び出すことによって、初期のサブシステムを初期化します。
+以下の初期のサブシステムは初期化されます:
 
 * `cpuset`;
 * `cpu`;
 * `cpuacct`.
 
-The `cgroup_init_subsys` function does initialization of the given subsystem with the default values. For example sets root of hierarchy, allocates space for the given subsystem with the call of the `css_alloc` callback function, link a subsystem with a parent if it exists, add allocated subsystem to the initial process and etc.
+`cgroup_init_subsys`関数は与えられたサブシステムをデフォルト値で初期化します。
+階層のルートを設定し、`css_alloc`コールバック関数の呼び出しで与えられたサブシステムのためのスペースを割り当て、もし親プロセスが存在する場合はサブシステムを親プロセスにリンクし、割り当てられたサブシステムなどを初期プロセスに追加します。
 
-That's all. From this moment early subsystems are initialized.
+これで全てです。この瞬間から、初期のサブシステムが初期化されます。
 
 まとめ
 --------------------------------------------------------------------------------
