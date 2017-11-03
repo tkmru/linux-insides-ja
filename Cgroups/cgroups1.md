@@ -7,12 +7,12 @@ Control Groups
 これは、[linux insides](http://0xax.gitbooks.io/linux-insides/content/)の新しい章の最初のパートです。
 パートの名前からあなたが予想したとおり、このパートではLinuxカーネル内での [control groups](https://en.wikipedia.org/wiki/Cgroups) や `cgroups`の仕組みを扱います。
 
-`Cgroups` はLinuxカーネルが提供する特別な仕組みであり、プロセスやプロセスの集合に対して、プロセッサ時間、グループあたりのプロセス数、コントロールグループあたりのメモリ量、またはそのようなリソースの組み合わせなどに対して `リソース` の種類を割り当てることができます。 
+`Cgroups` はLinuxカーネルが提供する特別な仕組みであり、プロセスやプロセスの集合に対して、Processor Time、グループあたりのプロセス数、コントロールグループあたりのメモリ量、またはそのようなリソースの組み合わせなどに対して `リソース` の種類を割り当てることができます。 
 `Cgroups`は階層的に構成されています。仕組みは通常のプロセスと似ていて、階層的であるため、子の`cgroups`は親から特定のパラメータの集合を継承します。
-しかし、実際には同じではありません。`cgroups` と通常のプロセスの主な違いは、通常のプロセスツリーは常に単一でありますが、コントロールグループでは多くの異なる階層が同時に存在する可能性があるということです。 
-各コントロールグループの階層が`サブシステム`のコントロールグループに関連付けられているため、単純なステップではありません。
+しかし、実際には同じではありません。`cgroups` と通常のプロセスの主な違いは、通常のプロセスツリーは常に単一であるがコントロールグループでは多くの異なる階層が同時に存在する可能性があるということです。 
+コントロールグループの階層がそれぞれ `サブシステム` のコントロールグループに関連付けられているため、単純ではありません。
 
-ある `control group subsystem` はプロセッサ時間、または [pids](https://en.wikipedia.org/wiki/Process_identifier) の数や、言い換えるなら、`control group` のプロセス数を表します。
+ある `control group subsystem` はProcessor Time、または [pids](https://en.wikipedia.org/wiki/Process_identifier) の数や、言い換えるなら、`control group` のプロセス数を表します。
 Linux カーネルは以下の12の `control group subsystems` のサポートを提供しています:
 
 * `cpuset` - 個々のプロセッサ（たち）とメモリノードをグループ内のタスク（たち）に割り当てます。
@@ -76,13 +76,13 @@ dr-xr-xr-x 5 root root  0 Dec  2 22:37 pids
 dr-xr-xr-x 5 root root  0 Dec  2 22:37 systemd
 ```
 
-すでに、あなたは `control groups`メカニズムは、Linuxカーネルのニーズに直接的に開発された仕組みでなく、
+あなたはすでに `control groups` のメカニズムは、Linuxカーネルのニーズに直接的に開発された仕組みでなく、
 主にユーザー空間のニーズに対して開発されたものだと勘づいているかもしれません。
-`control groups`を使うには、最初に作成するべきです。私たちは二つの方法で `cgroup`を作成するでしょう。
+`control groups`を使うには、まず最初に `control groups` を作成する必要があります。私たちは二つの方法で `cgroup`を作成するでしょう。
 
-最初の方法は、`sys/fs/cgroup` からサブディレクトリを作成し、サブディレクトリを作成した直後に自動的に作成される `tasks`ファイルにタスクのpidを追加することです。
+1つ目の方法は、`sys/fs/cgroup` からサブディレクトリを作成し、その作成直後に自動的に作成される `tasks`ファイルにタスクのpidを追加することです。
 
-2番目の方法は `libcgroup`ライブラリ（Fedoraの`libcgroup-tools`）のutilを使って `cgroups`を作成/破壊/管理する方法です。
+2つ目の方法は `libcgroup`ライブラリ（Fedoraの`libcgroup-tools`）のutilを使って `cgroups`を作成/破壊/管理する方法です。
 
 シンプルな例を考えてみましょう。 以下の[bash](https://www.gnu.org/software/bash/)スクリプトは、現在のプロセスの制御端末を表す `/dev/tty`デバイスに出力します：
 
@@ -146,7 +146,7 @@ total 0
 最初の `tasks`ファイルには、`cgroup_test_group`に付加されるプロセスのpid(s)が含まれていなければなりません。
 2番目の `devices.deny`ファイルには、拒否されたデバイスのリストが含まれています。
 デフォルトでは、新しく作成されたグループにはデバイスアクセスの制限がありません。
-デバイスを禁止するには（この場合は `/dev/tty`）、以下の行に`devices.deny`を書きこみます:
+デバイスアクセスを禁止するには（この場合は `/dev/tty`）、以下の行に`devices.deny`を書きこみます:
 
 ```
 # echo "c 5:0 w" > devices.deny
@@ -305,8 +305,8 @@ struct cgroup_subsys {
 `early_init`フラグは、早期に初期化されるかもしれない/初期化されるべきサブシステムを示す。
 `id`フィールドと`name`フィールドは、それぞれcgroupの登録されたサブシステムの配列内のユニークな識別子とサブシステムの`name`を表します。 最後の - `root`フィールドは、cgroupの階層のルートへのポインタを表します。
 
-もちろん `cgroup_subsys` 構造体は大きく、他のフィールドもありますが、今は十分です。
-`cgroups` メカニズムに関連する重要な構造を知るようになったので、`cgroup_init_early` 関数に戻りましょう。
+もちろん `cgroup_subsys`構造体は大きく、他のフィールドもありますが、今は十分です。
+`cgroups`メカニズムに関連する重要な構造を知れたので、`cgroup_init_early`関数に戻りましょう。
 この関数の主な目的は、いくつかのサブシステムの早期初期化を行うことです。 
 あなたがすでに想像しているように、これらの初期のサブシステムは `cgroup_subsys -> early_init = 1`を持つべきです。
 早期に初期化されるサブシステムを見てみましょう。
@@ -318,7 +318,7 @@ init_cgroup_root(&cgrp_dfl_root, &opts);
 cgrp_dfl_root.cgrp.self.flags |= CSS_NO_REF;
 ```
 
-ここでは、デフォルトの統一された階層の初期化を実行する `init_cgroup_root` 関数の呼び出しを見ることができます。
+ここでは、デフォルトの統一された階層の初期化を実行する `init_cgroup_root`関数の呼び出しを見ることができます。
 この後、このデフォルトの`cgroup`の状態で `CSS_NO_REF`フラグをセットしてこのcssの参照カウントを無効にします。
 `cgrp_dfl_root`は同じソースコードファイルで定義されています:
 
@@ -326,11 +326,11 @@ cgrp_dfl_root.cgrp.self.flags |= CSS_NO_REF;
 struct cgroup_root cgrp_dfl_root;
 ```
 
-その `cgrp`フィールドは`cgroup`構造体によってを表されます。
+その `cgrp`フィールドは `cgroup`構造体によってを表されます。
 これは[include/linux/cgroup-defs.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup-defs.h)内で定義されます。
-われわれは、Linuxカーネルの `task_struct`で表されるプロセスをすでに知っています。
-`task_struct`はこのタスクがついている`cgroup`への直接リンクを含んでいません。
-しかし、`task_struct`の`ccs_set`フィールドを通してそれを知ることができます。
+われわれは、Linuxカーネルの `task_struct` で表されるプロセスをすでに知っています。
+`task_struct` はこのタスクがついている `cgroup` への直接リンクを含んでいません。
+しかし、`task_struct `の `ccs_set`フィールドを通してそれを知ることができます。
 この `ccs_set`構造体は、サブシステム状態の配列へのポインタを保持します:
 
 
@@ -346,7 +346,7 @@ struct css_set {
 }
 ```
 
-そして、`cgroup_subsys_state`を通して、プロセスはアタッチする`cgroup`を取得できます:
+そして、`cgroup_subsys_state` を通して、プロセスはアタッチする `cgroup` を取得できます:
 
 ```C
 struct cgroup_subsys_state {
@@ -397,8 +397,8 @@ struct cgroup_subsys_state {
 ```
 
 
-`init_cgroup_root`は`cgrp_dfl_root`をデフォルト値で埋めます。
-次に、システムの最初のプロセスを表す `init_task`に最初の`ccs_set`を割り当てます。:
+`init_cgroup_root` は `cgrp_dfl_root` をデフォルト値で埋めます。
+次に、システムの最初のプロセスを表す `init_task` に最初の `ccs_set` を割り当てます。:
 
 ```C
 RCU_INIT_POINTER(init_task.cgroups, &init_css_set);
@@ -417,7 +417,7 @@ for_each_subsys(ss, i) {
 }
 ```
 
-ここの`for_each_subsys`は、[kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c)で定義されているマクロです。`cgroup_subsys`配列に対する`for`ループです。
+ここの`for_each_subsys` マクロは、[kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c)で定義されているものです。`cgroup_subsys`配列に対する`for`ループです。
 この配列の定義は、同じファイルにありますが、それは少し奇妙です:
 
 ```C
@@ -460,14 +460,14 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 };
 ```
 
-したがって、`cgroup_init_early`関数の最後のステップでは、`cgroup_init_subsys`関数を呼び出すことによって、初期のサブシステムを初期化します。
+したがって、`cgroup_init_early` 関数の最後のステップでは、`cgroup_init_subsys`関数を呼び出すことによって、初期のサブシステムを初期化します。
 以下の初期のサブシステムは初期化されます:
 
 * `cpuset`;
 * `cpu`;
 * `cpuacct`.
 
-`cgroup_init_subsys`関数は与えられたサブシステムをデフォルト値で初期化します。
+`cgroup_init_subsys` 関数は与えられたサブシステムをデフォルト値で初期化します。
 階層のルートを設定し、`css_alloc`コールバック関数の呼び出しで与えられたサブシステムのためのスペースを割り当て、もし親プロセスが存在する場合はサブシステムを親プロセスにリンクし、割り当てられたサブシステムなどを初期プロセスに追加します。
 
 これで全てです。この瞬間から、初期のサブシステムが初期化されます。
