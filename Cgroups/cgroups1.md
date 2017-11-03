@@ -276,7 +276,7 @@ struct cgroup_sb_opts {
 
 
 これは `cgroupfs` のマウントオプションを表します。
-例えば、以下のコマンドは`name =`オプションを持ち、サブシステムを持たないnamed cgroup hierarchy（名前は `my_cgrp`）を作成します:
+例えば、以下のコマンドは`name =`オプションを持ち、サブシステムを持たない、名付けられた cgroupの階層（名前は `my_cgrp`）を作成します:
 
 ```
 $ mount -t cgroup -oname=my_cgrp,none /mnt/cgroups
@@ -307,7 +307,7 @@ struct cgroup_subsys {
 
 もちろん `cgroup_subsys`構造体は大きく、他のフィールドもありますが、今は十分です。
 `cgroups`メカニズムに関連する重要な構造を知れたので、`cgroup_init_early`関数に戻りましょう。
-この関数の主な目的は、いくつかのサブシステムの早期初期化を行うことです。 
+この関数の主な目的は、いくつかの早期にサブシステムの初期化を行うことです。 
 あなたがすでに想像しているように、これらの初期のサブシステムは `cgroup_subsys -> early_init = 1`を持つべきです。
 早期に初期化されるサブシステムを見てみましょう。
 
@@ -404,7 +404,7 @@ struct cgroup_subsys_state {
 RCU_INIT_POINTER(init_task.cgroups, &init_css_set);
 ```
 
-そして、`cgroup_init_early`関数の最後の大きなことは`early cgroups`の初期化です。
+そして、`cgroup_init_early`関数の最後の大きなことは `early cgroups` の初期化です。
 ここでは、すべての登録されたサブシステムを調べ、一意の識別番号、サブシステムの名前を割り当て、早期にマークされたサブシステムのために `cgroup_init_subsys`関数を呼び出します。:
 
 ```C
@@ -417,7 +417,7 @@ for_each_subsys(ss, i) {
 }
 ```
 
-ここの`for_each_subsys` マクロは、[kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c)で定義されているものです。`cgroup_subsys`配列に対する`for`ループです。
+ここの `for_each_subsys`マクロは、[kernel/cgroup.c](https://github.com/torvalds/linux/blob/master/kernel/cgroup.c)で定義されているものです。`cgroup_subsys`配列に対する`for`ループです。
 この配列の定義は、同じファイルにありますが、それは少し奇妙です:
 
 ```C
@@ -429,7 +429,7 @@ for_each_subsys(ss, i) {
 ```
 
 1つの引数（サブシステムの名前）をとり、cgroupサブシステムの `cgroup_subsys`配列を定義する`SUBSYS`マクロとして定義されています。
-それに加えて、配列が[linux/cgroup_subsys.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup_subsys.h)ヘッダーファイルの内容で初期化されていることがわかります。
+それに加えて、配列が [linux/cgroup_subsys.h](https://github.com/torvalds/linux/blob/master/include/linux/cgroup_subsys.h)ヘッダーファイルの内容で初期化されていることがわかります。
 このヘッダーファイルを見てみると、指定されたサブシステムの名前を持つ`SUBSYS`マクロのセットが再び表示されます:
 
 ```C
@@ -460,14 +460,14 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 };
 ```
 
-したがって、`cgroup_init_early` 関数の最後のステップでは、`cgroup_init_subsys`関数を呼び出すことによって、初期のサブシステムを初期化します。
+したがって、`cgroup_init_early`関数の最後のステップでは、`cgroup_init_subsys`関数を呼び出すことによって、初期のサブシステムを初期化します。
 以下の初期のサブシステムは初期化されます:
 
 * `cpuset`;
 * `cpu`;
 * `cpuacct`.
 
-`cgroup_init_subsys` 関数は与えられたサブシステムをデフォルト値で初期化します。
+`cgroup_init_subsys`関数は与えられたサブシステムをデフォルト値で初期化します。
 階層のルートを設定し、`css_alloc`コールバック関数の呼び出しで与えられたサブシステムのためのスペースを割り当て、もし親プロセスが存在する場合はサブシステムを親プロセスにリンクし、割り当てられたサブシステムなどを初期プロセスに追加します。
 
 これで全てです。この瞬間から、初期のサブシステムが初期化されます。
@@ -475,7 +475,7 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 まとめ
 --------------------------------------------------------------------------------
 
-これでLinuxカーネルの`Control groups`の仕組みについての最初のパートは終わりです。
+これでLinuxカーネルの `Control groups` の仕組みについての最初のパートは終わりです。
 `control groups`の仕組みに関連する初期化の最初のステップと理論を見てきました。
 次のパートでは、`control groups`の実践的な側面を見ていこうと思います。
 
