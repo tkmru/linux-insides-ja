@@ -4,50 +4,59 @@ Kernel booting process. Part 2.
 カーネルセットアップの最初のステップ
 --------------------------------------------------------------------------------
 
-We started to dive into linux kernel insides in the previous [part](linux-bootstrap-1.md) and saw the initial part of the kernel setup code. 
-We stopped at the first call to the `main` function (which is the first function written in C) from [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c).
+前回の[パート](linux-bootstrap-1.md)では、Linuxカーネルの中へ潜り始め、カーネルをセットアップするコードの初期の部分を見ていきました。
+私たちは、[arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c)内の `main`関数（C言語で書かれた最初の関数）を初めて呼び出すところで止まっていました。
 
-In this part we will continue to research the kernel setup code and
-* see what `protected mode` is,
-* some preparation for the transition into it,
-* the heap and console initialization,
-* memory detection, cpu validation, keyboard initialization
-* and much much more.
+このパートでは、引き続きカーネルのセットアップコードについての調査と以下の内容をやります。
 
-So, Let's go ahead.
+* `プロテクトモード` が何なのか、
+* `プロテクトモード` に入るための準備、
+* ヒープとコンソールの初期化、
+* メモリの検出、cpu validation、キーボードの初期化
+* その他いろいろ
+
+では、やっていきましょう。
 
 プロテクトモード
 --------------------------------------------------------------------------------
 
-Before we can move to the native Intel64 [Long Mode](http://en.wikipedia.org/wiki/Long_mode), the kernel must switch the CPU into protected mode.
+ネイティブの Intel64 [ロングモード](http://en.wikipedia.org/wiki/Long_mode) に切り替える前に、 カーネルはCPUをプロテクトモードに切り替える必要があります。
 
-What is [protected mode](https://en.wikipedia.org/wiki/Protected_mode)? Protected mode was first added to the x86 architecture in 1982 and was the main mode of Intel processors from the [80286](http://en.wikipedia.org/wiki/Intel_80286) processor until Intel 64 and long mode came.
+[プロテクトモード](https://en.wikipedia.org/wiki/Protected_mode)とは何でしょう? 
+プロテクトモードが最初に x86アーキテクチャ に追加されたのは1982年で、
+このモードは[80286](http://en.wikipedia.org/wiki/Intel_80286)プロセッサが出てから、Intel 64とロングモードが登場するまでは、主要のモードでした。
 
-The main reason to move away from [Real mode](http://wiki.osdev.org/Real_Mode) is that there is very limited access to the RAM. As you may remember from the previous part, there is only 2<sup>20</sup> bytes or 1 Megabyte, sometimes even only 640 Kilobytes of RAM available in the Real mode.
+[リアルモード](http://wiki.osdev.org/Real_Mode)から移行した主な理由は、RAMへのアクセスが非常に制限されていたからです。
+前回のパートの内容を覚えているかもしれませんが、リアルモードで利用可能なRAMはせいぜい2<sup>20</sup>byteか1MBで、中には640KBしかないものもあります。
 
-Protected mode brought many changes, but the main one is the difference in memory management. The 20-bit address bus was replaced with a 32-bit address bus. It allowed access to 4 Gigabytes of memory vs 1 Megabyte of real mode. Also, [paging](http://en.wikipedia.org/wiki/Paging) support was added, which you can read about in the next sections.
+プロテクトモードになって、多くの点が変わりましたが、メモリ管理で最も大きな変更がありました。
+20bitアドレスバスが32bitアドレスバスに置き換えられたことで、リアルモードでは1MBのメモリにしかアクセスできなかったのが、4GBのメモリにアクセスが可能になりました。
+さらにプロテクトモードは、[ページング](http://en.wikipedia.org/wiki/Paging)にもまた対応しています。これについては、次のセクションで紹介します。
 
-Memory management in Protected mode is divided into two, almost independent parts:
+プロテクトモードにおけるメモリ管理は、ほぼ独立した次の2つの方式に分かれます。:
 
-* Segmentation
-* Paging
+* セグメンテーション
+* ページング
 
-Here we will only see segmentation. Paging will be discussed in the next sections.
+セグメンテーションにのみここでは見ていきます。ページングに関しては次のセクションで見ていきましょう。
 
-As you can read in the previous part, addresses consist of two parts in real mode:
+あなたは前のパートでリアルモードのアドレスは２つのパートで構成されると学びました:
 
-* Base address of the segment
-* Offset from the segment base
+* セグメントのベースアドレス
+* セグメントベースからのオフセット
 
-And we can get the physical address if we know these two parts by:
+そして、これらの2つの情報が分かれば、物理アドレスを取得することができます:
 
 ```
 PhysicalAddress = Segment Selector * 16 + Offset
 ```
 
-Memory segmentation was completely redone in protected mode. There are no 64 Kilobyte fixed-size segments. Instead, the size and location of each segment is described by an associated data structure called _Segment Descriptor_. The segment descriptors are stored in a data structure called `Global Descriptor Table` (GDT).
+プロテクトモードになって、メモリセグメンテーションが一新され、64KBの固定サイズのセグメントがなくなりました。
+その代わりに、各セグメントのサイズと位置は、セグメントディスクリプタと呼ばれる一連のデータ構造体で表現されます。
+このセグメントディスクリプタが格納されているのが、`Global Descriptor Table`（GDT）というデータ構造体です。
 
-The GDT is a structure which resides in memory. It has no fixed place in the memory so, its address is stored in the special `GDTR` register. Later we will see the GDT loading in the Linux kernel code. There will be an operation for loading it into memory, something like:
+GDTはメモリ内にある構造体です。GDTの場所はメモリ内で固定されているわけではなく、専用の `GDTR`レジスタにアドレスが格納されています。
+LinuxカーネルのコードでGDTを読み込む方法については、後ほど見ていきましょう。以下のようにGDTは、メモリに読み込まれます:
 
 ```assembly
 lgdt gdt
@@ -55,8 +64,8 @@ lgdt gdt
 
 where the `lgdt` instruction loads the base address and limit(size) of global descriptor table to the `GDTR` register. `GDTR` is a 48-bit register and consists of two parts:
 
- * size(16-bit) of global descriptor table;
- * address(32-bit) of the global descriptor table.
+ * グローバルディスクリプタテーブルのサイズ（16bit）
+ * グローバルディスクリプタテーブルのアドレス（32bit）
 
 As mentioned above the GDT contains `segment descriptors` which describe memory segments.  Each descriptor is 64-bits in size. The general scheme of a descriptor is:
 
@@ -136,7 +145,7 @@ As we can see the first bit(bit 43) is `0` for a _data_ segment and `1` for a _c
 
 8. D/B flag(bit 54) - Default/Big flag represents the operand size i.e 16/32 bits. If it is set then 32 bit otherwise 16.
 
-Segment registers contain segment selectors as in real mode. However, in protected mode, a segment selector is handled differently. Each Segment Descriptor has an associated Segment Selector which is a 16-bit structure:
+Segment registers contain segment selectors as in real mode. However, in プロテクトモード, a segment selector is handled differently. Each Segment Descriptor has an associated Segment Selector which is a 16-bit structure:
 
 ```
 15              3  2   1  0
@@ -154,24 +163,24 @@ Every segment register has a visible and hidden part.
 * Visible - Segment Selector is stored here
 * Hidden - Segment Descriptor(base, limit, attributes, flags)
 
-The following steps are needed to get the physical address in the protected mode:
+The following steps are needed to get the physical address in the プロテクトモード:
 
 * The segment selector must be loaded in one of the segment registers
 * The CPU tries to find a segment descriptor by GDT address + Index from selector and load the descriptor into the *hidden* part of the segment register
-* Base address (from segment descriptor) + offset will be the linear address of the segment which is the physical address (if paging is disabled).
+* Base address (from segment descriptor) + offset will be the linear address of the segment which is the physical address (if ページング is disabled).
 
 Schematically it will look like this:
 
 ![linear address](http://oi62.tinypic.com/2yo369v.jpg)
 
-The algorithm for the transition from real mode into protected mode is:
+The algorithm for the transition from real mode into プロテクトモード is:
 
 * Disable interrupts
 * Describe and load GDT with `lgdt` instruction
 * Set PE (Protection Enable) bit in CR0 (Control Register 0)
-* Jump to protected mode code
+* Jump to プロテクトモード code
 
-We will see the complete transition to protected mode in the linux kernel in the next part, but before we can move to protected mode, we need to do some more preparations.
+We will see the complete transition to プロテクトモード in the linux kernel in the next part, but before we can move to プロテクトモード, we need to do some more preparations.
 
 Let's look at [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c). We can see some routines there which perform keyboard initialization, heap initialization, etc... Let's take a look.
 
@@ -490,9 +499,9 @@ At the end of `query_mca` it just copies the table pointed to by `es:bx` to the 
 
 The next step is getting [Intel SpeedStep](http://en.wikipedia.org/wiki/SpeedStep) information by calling the `query_ist` function. First of all it checks the CPU level and if it is correct, calls `0x15` for getting info and saves the result to `boot_params`.
 
-The following [query_apm_bios](https://github.com/torvalds/linux/blob/master/arch/x86/boot/apm.c#L21) function gets [Advanced Power Management](http://en.wikipedia.org/wiki/Advanced_Power_Management) information from the BIOS. `query_apm_bios` calls the `0x15` BIOS interruption too, but with `ah` = `0x53` to check `APM` installation. After the `0x15` execution, `query_apm_bios` functions check the `PM` signature (it must be `0x504d`), carry flag (it must be 0 if `APM` supported) and value of the `cx` register (if it's 0x02, protected mode interface is supported).
+The following [query_apm_bios](https://github.com/torvalds/linux/blob/master/arch/x86/boot/apm.c#L21) function gets [Advanced Power Management](http://en.wikipedia.org/wiki/Advanced_Power_Management) information from the BIOS. `query_apm_bios` calls the `0x15` BIOS interruption too, but with `ah` = `0x53` to check `APM` installation. After the `0x15` execution, `query_apm_bios` functions check the `PM` signature (it must be `0x504d`), carry flag (it must be 0 if `APM` supported) and value of the `cx` register (if it's 0x02, プロテクトモード interface is supported).
 
-Next it calls `0x15` again, but with `ax = 0x5304` for disconnecting the `APM` interface and connecting the 32-bit protected mode interface. In the end it fills `boot_params.apm_bios_info` with values obtained from the BIOS.
+Next it calls `0x15` again, but with `ax = 0x5304` for disconnecting the `APM` interface and connecting the 32-bit プロテクトモード interface. In the end it fills `boot_params.apm_bios_info` with values obtained from the BIOS.
 
 Note that `query_apm_bios` will be executed only if `CONFIG_APM` or `CONFIG_APM_MODULE` was set in the configuration file:
 
@@ -525,7 +534,7 @@ where `0x80` is the first hard drive and the value of `EDD_MBR_SIG_MAX` macro is
 まとめ
 --------------------------------------------------------------------------------
 
-This is the end of the second part about Linux kernel insides. In the next part we will see video mode setting and the rest of preparations before transition to protected mode and directly transitioning into it.
+This is the end of the second part about Linux kernel insides. In the next part we will see video mode setting and the rest of preparations before transition to プロテクトモード and directly transitioning into it.
 
 If you have any questions or suggestions write me a comment or ping me at [twitter](https://twitter.com/0xAX).
 
@@ -546,4 +555,4 @@ If you have any questions or suggestions write me a comment or ping me at [twitt
 * [APM](https://en.wikipedia.org/wiki/Advanced_Power_Management)
 * [EDD specification](http://www.t13.org/documents/UploadedDocuments/docs2004/d1572r3-EDD3.pdf)
 * [TLDP documentation for Linux Boot Process](http://www.tldp.org/HOWTO/Linux-i386-Boot-Code-HOWTO/setup.html) (old)
-* [1つ前の章](linux-bootstrap-1.md)
+* [1つ前のパート](linux-bootstrap-1.md)
