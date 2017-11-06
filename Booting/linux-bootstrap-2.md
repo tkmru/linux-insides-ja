@@ -62,12 +62,14 @@ LinuxカーネルのコードでGDTを読み込む方法については、後ほ
 lgdt gdt
 ```
 
-where the `lgdt` instruction loads the base address and limit(size) of global descriptor table to the `GDTR` register. `GDTR` is a 48-bit register and consists of two parts:
+この`lgdt`命令で、`GDTR`レジスタ にベースアドレスとグローバルディスクリプタテーブルの制限（サイズ）を読み込みます。
+`GDTR` は48bitのレジスタで、以下の2つの部分から構成されています:
 
  * グローバルディスクリプタテーブルのサイズ（16bit）
  * グローバルディスクリプタテーブルのアドレス（32bit）
 
-As mentioned above the GDT contains `segment descriptors` which describe memory segments.  Each descriptor is 64-bits in size. The general scheme of a descriptor is:
+先ほど説明したように、GDTにはメモリセグメントを表す `segment descriptors` が含まれています。
+各ディスクリプタのサイズは64bitで、ディスクリプタの一般的な配置は次のようになっています:
 
 ```
 31          24        19      16              7            0
@@ -82,27 +84,31 @@ As mentioned above the GDT contains `segment descriptors` which describe memory 
 ------------------------------------------------------------
 ```
 
-Don't worry, I know it looks a little scary after real mode, but it's easy. For example LIMIT 15:0 means that bit 0-15 of the Descriptor contain the value for the limit. The rest of it is in LIMIT 19:16. So, the size of Limit is 0-19 i.e 20-bits. Let's take a closer look at it:
+リアルモードの後でこれを見ると、少し怖いかもしれませんが、これは簡単です。
+例えば、LIMIT 15:0というのは、ディスクリプタのbit 0–15に制限の値が含まれていることを意味します。
+そして残りはLIMIT 19:16の中にあります。よってリミットのサイズは0–19なので、20bitです。詳しく見てみましょう。:
 
-1. Limit[20-bits] is at 0-15,16-19 bits. It defines `length_of_segment - 1`. It depends on `G`(Granularity) bit.
+1. Limit[20bit]は0–15と16–19のbitにあります。これは`length_of_segment – 1`を定義し、`G`（粒度）ビットに依存します。
 
-  * if `G` (bit 55) is 0 and segment limit is 0, the size of the segment is 1 Byte
-  * if `G` is 1 and segment limit is 0, the size of the segment is 4096 Bytes
-  * if `G` is 0 and segment limit is 0xfffff, the size of the segment is 1 Megabyte
-  * if `G` is 1 and segment limit is 0xfffff, the size of the segment is 4 Gigabytes
+  * `G`（bit 55）とセグメントリミットが0の場合、セグメントのサイズは1byteです。
+  * `G` が1でセグメントリミットが0の場合、セグメントのサイズは4096byteです。
+  * `G` が0でセグメントリミットが0xfffffの場合、セグメントのサイズは1MBです。
+  * `G` が1でセグメントリミットが0xfffffの場合、セグメントのサイズは4GBです。
 
-  So, it means that if
-  * if G is 0, Limit is interpreted in terms of 1 Byte and the maximum size of the segment can be 1 Megabyte.
-  * if G is 1, Limit is interpreted in terms of 4096 Bytes = 4 KBytes = 1 Page and the maximum size of the segment can be 4 Gigabytes. Actually, when G is 1, the value of Limit is shifted to the left by 12 bits. So, 20 bits + 12 bits = 32 bits and 2<sup>32</sup> = 4 Gigabytes.
+  つまり以下のようになります。
 
-2. Base[32-bits] is at (0-15, 32-39 and 56-63 bits). It defines the physical address of the segment's starting location.
+  * `G` が0なら、Limitは1バイト単位と見なされ、セグメントの最大サイズは1MBになります。
+  * `G` が1なら、Limitは4096バイト ＝ 4キロバイト ＝ 1ページ単位と見なされ、セグメントの最大サイズは4GBになります。実際、`G`が1なら、LIMITの値は1bit分左にずれます。つまり20bit ＋ 12bitで32bit、すなわち2<sup>32</sup> ＝ 4GBになります。
 
-3. Type/Attribute (40-47 bits) defines the type of segment and kinds of access to it.
-  * `S` flag at bit 44 specifies descriptor type. If `S` is 0 then this segment is a system segment, whereas if `S` is 1 then this is a code or data segment (Stack segments are data segments which must be read/write segments).
+2. Base[32bit]は（0–15、32–39、56–63bit）にあり、これはセグメントの開始位置の物理アドレスを定義します。
 
-To determine if the segment is a code or data segment we can check its Ex(bit 43) Attribute marked as 0 in the above diagram. If it is 0, then the segment is a Data segment otherwise it is a code segment.
+3. タイプ/属性（40–47bit）はセグメントのタイプとセグメントに対する種々のアクセスについて定義します
+  * bit 44の `S`フラグはディスクリプタのタイプを指定します。`S`が0ならこのセグメントはシステムセグメントで、`S`が1ならコードまたはデータのセグメントになります（スタックセグメントはデータセグメントで、これは読み書き可能なセグメントである必要があります）。
 
-A segment can be of one of the following types:
+このセグメントがコードとデータ、どちらのセグメントなのかを判別するには、以下の図で0と表記されたEx(bit 43)属性を確認します。
+これが0ならセグメントはデータセグメントで、1ならコードセグメントになります。
+
+セグメントは以下のいずれかのタイプになります:
 
 ```
 |           Type Field        | Descriptor Type | Description
