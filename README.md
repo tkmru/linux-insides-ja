@@ -9,7 +9,7 @@ linuxカーネルとその内部についての製作中の本です。
 
 **質問/提案**: 質問や提案は twitter [@0xAX](https://twitter.com/0xAX) または [email](mailto:anotherworldofworld@gmail.com) で連絡を取るか、 [issue](https://github.com/0xAX/linux-insides/issues/new) を作成することで気軽にしてください。
 
-サポート
+原著者へのサポート
 -------
 
 `linux-insides`を気に入れば以下の方法で **サポート** することができます:
@@ -41,7 +41,7 @@ Contributions
 
 ![image](http://oi58.tinypic.com/23upobq.jpg)
 
-著者
+原著者
 ---------------
 
 [@0xAX](https://twitter.com/0xAX)
