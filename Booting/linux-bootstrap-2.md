@@ -22,7 +22,7 @@ Kernel booting process. Part 2.
 
 ネイティブの Intel64 [ロングモード](http://en.wikipedia.org/wiki/Long_mode) に切り替える前に、 カーネルはCPUをプロテクトモードに切り替える必要があります。
 
-[プロテクトモード](https://en.wikipedia.org/wiki/Protected_mode)とは何でしょう? 
+[プロテクトモード](https://en.wikipedia.org/wiki/Protected_mode)とは何でしょう?
 プロテクトモードが最初に x86アーキテクチャ に追加されたのは1982年で、
 このモードは[80286](http://en.wikipedia.org/wiki/Intel_80286)プロセッサが出てから、Intel 64とロングモードが登場するまでは、主要のモードでした。
 
@@ -98,7 +98,7 @@ lgdt gdt
   つまり以下のようになります。
 
   * `G` が0なら、Limitは1バイト単位と見なされ、セグメントの最大サイズは1MBになります。
-  * `G` が1なら、Limitは4096バイト ＝ 4キロバイト ＝ 1ページ単位と見なされ、セグメントの最大サイズは4GBになります。実際、`G`が1なら、LIMITの値は1bit分左にずれます。つまり20bit ＋ 12bitで32bit、すなわち2<sup>32</sup> ＝ 4GBになります。
+  * `G` が1なら、Limitは4096バイト ＝ 4KB ＝ 1ページ単位と見なされ、セグメントの最大サイズは4GBになります。実際、`G`が1なら、LIMITの値は1bit分左にずれます。つまり20bit ＋ 12bitで32bit、すなわち2<sup>32</sup> ＝ 4GBになります。
 
 2. Base[32bit]は（0–15、32–39、56–63bit）にあり、これはセグメントの開始位置の物理アドレスを定義します。
 
