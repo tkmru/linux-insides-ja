@@ -134,24 +134,28 @@ lgdt gdt
 | 15          1    1    1   1 | Code            | Execute/Read, conforming, accessed
 ```
 
-As we can see the first bit(bit 43) is `0` for a _data_ segment and `1` for a _code_ segment. The next three bits (40, 41, 42) are either `EWA`(*E*xpansion *W*ritable *A*ccessible) or CRA(*C*onforming *R*eadable *A*ccessible).
-  * if E(bit 42) is 0, expand up otherwise expand down. Read more [here](http://www.sudleyplace.com/dpmione/expanddown.html).
-  * if W(bit 41)(for Data Segments) is 1, write access is allowed otherwise not. Note that read access is always allowed on data segments.
-  * A(bit 40) - Whether the segment is accessed by processor or not.
-  * C(bit 43) is conforming bit(for code selectors). If C is 1, the segment code can be executed from a lower level privilege e.g. user level. If C is 0, it can only be executed from the same privilege level.
-  * R(bit 41)(for code segments). If 1 read access to segment is allowed otherwise not. Write access is never allowed to code segments.
+見て取れるように最初のビット（bit 43）は、_data_ セグメントの場合は`0`で、_code_ セグメントの場合は`1`です。
+続く3つのbit(40, 41,42)は`EWA`(*E*xpansion *W*ritable *A*ccessible)またはCRA(*C*onforming *R*eadable *A*ccessible)のどちらかになります。
 
-4. DPL[2-bits] (Descriptor Privilege Level) is at bits 45-46. It defines the privilege level of the segment. It can be 0-3 where 0 is the most privileged.
+  *E（bit 42）が0なら上に拡張し、1なら下に拡張します。詳細は[こちら](http://www.sudleyplace.com/dpmione/expanddown.html)を参照してください。
+  *W（bit 41）（データセグメントの場合）が1なら書き込みアクセスが可能、0なら不可です。データセグメントでは、読み取りアクセスが常に許可されている点に注目してください。
+  *A（bit 40）はプロセッサからセグメントへのアクセス可能か否かを示します。
+  *C（bit 43）（コードセレクタの場合）はコンフォーミングビットです。Cが1なら、ユーザレベルなどの下位レベルの権限から、セグメントコードを実行することが可能です。Cが0なら、同じ権限レベルからのみ実行可能です。
+  *R（bit 41）（コードセグメントの場合）が1なら、セグメントへの読み取りアクセスが可能、0なら不可です。コードセグメントに対して、書き込みアクセスは一切できません。
 
-5. P flag(bit 47) - indicates if the segment is present in memory or not. If P is 0, the segment will be presented as _invalid_ and the processor will refuse to read this segment.
+4. DPL[2-bits]はbits 45 – 46にあります。これはセグメントの特権レベルを定義し、値は0-3で、0が最も権限があります。
 
-6. AVL flag(bit 52) - Available and reserved bits. It is ignored in Linux.
+5. Pフラグ（bit 47）は、セグメントがメモリ内にあるか否かを示します。Pが0なら、セグメントは無効であることを意味し、プロセッサはこのセグメントの読み取りを拒否します。
 
-7. L flag(bit 53) - indicates whether a code segment contains native 64-bit code. If 1 then the code segment executes in 64-bit mode.
+6. AVLフラグ（bit 52）は利用可能な予約ビットで、Linuxにおいては無視されます。
 
-8. D/B flag(bit 54) - Default/Big flag represents the operand size i.e 16/32 bits. If it is set then 32 bit otherwise 16.
+7. Lフラグ（ビット53）は、コードセグメントがネイティブ64ビットコードを含んでいるかを示します。1ならコードセグメントは64ビットモードで実行されます。
 
-Segment registers contain segment selectors as in real mode. However, in プロテクトモード, a segment selector is handled differently. Each Segment Descriptor has an associated Segment Selector which is a 16-bit structure:
+8. D/Bフラグ（ビット54）は、デフォルト/ビッグフラグで、例えば16/32ビットのようなオペランドのサイズを表します。フラグがセットされていれば32ビット、そうでなければ16ビットです。
+
+セグメントレジスタには、リアルモードのようにセグメントセレクタが含まれていません。
+しかし、プロテクトモードでは、セグメントレジスタの扱いは異なります。各セグメントディスクリプタは
+関連する16ビットの構造体であるSegment Selectorを持ちます。:
 
 ```
 15              3  2   1  0
@@ -161,34 +165,35 @@ Segment registers contain segment selectors as in real mode. However, in プロ�
 ```
 
 Where,
-* **Index** shows the index number of the descriptor in the GDT.
-* **TI**(Table Indicator) shows where to search for the descriptor. If it is 0 then search in the Global Descriptor Table(GDT) otherwise it will look in Local Descriptor Table(LDT).
-* And **RPL** is Requester's Privilege Level.
+* **Index** がGDTにおけるディスクリプタのインデックス番号を示します。
+* **TI**(Table Indicator) はディスクリプタを探す場所を示します。0ならば、Global Descriptor Table（GDT）内を検索し、そうでない場合は、Local Descriptor Table（LDT）内を調べます。
+* **RPL** は、Requester’s Privilege Levelのことです。
 
-Every segment register has a visible and hidden part.
-* Visible - Segment Selector is stored here
-* Hidden - Segment Descriptor(base, limit, attributes, flags)
+すべてのセグメントレジスタは見える部分と隠れた部分を持っています。
 
-The following steps are needed to get the physical address in the プロテクトモード:
+* Visible – セグメントセレクタはここに保存されています。
+* Hidden – セグメントディスクリプタ（ベース、制限、属性、フラグ）
 
-* The segment selector must be loaded in one of the segment registers
-* The CPU tries to find a segment descriptor by GDT address + Index from selector and load the descriptor into the *hidden* part of the segment register
-* Base address (from segment descriptor) + offset will be the linear address of the segment which is the physical address (if ページング is disabled).
+以下のステップは、プロテクトモードで物理アドレスを取得するのに要する手順です。:
 
-Schematically it will look like this:
+* セグメントセレクタはセグメントレジスタの1つにロードしなければなりません。
+* CPUは、GDTアドレスとセレクタのIndexによってセグメントディスクリプタを特定し、ディスクリプタをセグメントレジスタの *隠れた* 部分にロードしようとします。
+* ベースアドレス（セグメントディスクリプタから）+オフセットは、物理アドレスであるセグメントのリニアアドレスになります。（ページングが無効の場合）
+
+図で表すとこうなります:
 
 ![linear address](http://oi62.tinypic.com/2yo369v.jpg)
 
-The algorithm for the transition from real mode into プロテクトモード is:
+リアルモードからプロテクトモードへ移行するためのアルゴリズムは、
 
-* Disable interrupts
-* Describe and load GDT with `lgdt` instruction
-* Set PE (Protection Enable) bit in CR0 (Control Register 0)
-* Jump to プロテクトモード code
+* 割り込みを無効にします。
+* `lgdt`命令でGDTを記述、ロードします。
+* CR0（コントロールレジスタ0）におけるPE（Protection Enable、プロテクト有効化）ビットを設定します。
+* プロテクトモードのコードにジャンプします。
 
-We will see the complete transition to プロテクトモード in the linux kernel in the next part, but before we can move to プロテクトモード, we need to do some more preparations.
+次の章でlinuxカーネル内で完璧にプロテクトモードへの移行をします。ただ、プロテクトモードへ移る前にもう少し準備が必要です。
 
-Let's look at [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c). We can see some routines there which perform keyboard initialization, heap initialization, etc... Let's take a look.
+[arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c)を見てみましょう。キーボード初期化、ヒープ初期化などを実行する部分があるのがわかります。よく見てみましょう。
 
 ブートパラメータを ”zeropage” にコピー
 --------------------------------------------------------------------------------
@@ -540,11 +545,10 @@ where `0x80` is the first hard drive and the value of `EDD_MBR_SIG_MAX` macro is
 まとめ
 --------------------------------------------------------------------------------
 
-This is the end of the second part about Linux kernel insides. In the next part we will see video mode setting and the rest of preparations before transition to プロテクトモード and directly transitioning into it.
+これでLinuxカーネルインターナルに関する記事のパート2は終わりです。次のパートではビデオモード設定とプロテクトモード移行の前に必要な残りの準備、そしてそのまま移行について見ていきましょう。
+もし質問や提案があれば Twitter [0xAX](https://twitter.com/0xAX) や [email](anotherworldofworld@gmail.com) で連絡していただくか、Issueを作成してください。
 
-If you have any questions or suggestions write me a comment or ping me at [twitter](https://twitter.com/0xAX).
-
-**Please note that English is not my first language, And I am really sorry for any inconvenience. If you find any mistakes please send me a PR to [linux-insides](https://github.com/0xAX/linux-internals).**
+**ご注意：英語は私の第一言語ではないことをご承知おきください。誤りを見つけた方は[linux-insides](https://github.com/0xAX/linux-internals)に、プルリクエストを送ってください。**
 
 
 --------------------------------------------------------------------------------
