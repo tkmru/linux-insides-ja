@@ -164,7 +164,6 @@ lgdt gdt
 -----------------------------
 ```
 
-Where,
 * **Index** がGDTにおけるディスクリプタのインデックス番号を示します。
 * **TI**(Table Indicator) はディスクリプタを探す場所を示します。0ならば、Global Descriptor Table（GDT）内を検索し、そうでない場合は、Local Descriptor Table（LDT）内を調べます。
 * **RPL** は、Requester’s Privilege Levelのことです。
@@ -198,15 +197,17 @@ Where,
 ブートパラメータを ”zeropage” にコピー
 --------------------------------------------------------------------------------
 
-We will start from the `main` routine in "main.c". First function which is called in `main` is [`copy_boot_params(void)`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L30). It copies the kernel setup header into the field of the `boot_params` structure which is defined in the [arch/x86/include/uapi/asm/bootparam.h](https://github.com/torvalds/linux/blob/master/arch/x86/include/uapi/asm/bootparam.h#L113).
+“main.c”の`main`ルーティンから始めましょう。`main`の中で最初に呼び出される関数は[`copy_boot_params(void)`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L30)です。
+これは、カーネル設定ヘッダを、[arch/x86/include/uapi/asm/bootparam.h](https://github.com/torvalds/linux/blob/master/arch/x86/include/uapi/asm/bootparam.h#L113)にて定義された`boot_params`構造体のフィールドにコピーします。
 
-The `boot_params` structure contains the `struct setup_header hdr` field. This structure contains the same fields as defined in [linux boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt) and is filled by the boot loader and also at kernel compile/build time. `copy_boot_params` does two things:
+`boot_params`構造体は、`struct setup_header hdr`フィールドを持っています。この構造体は[linux boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt)で定義されているのと同じフィールドを持ち、
+ブートローダによって、カーネルのコンパイル/ビルド時に書き込まれます。`copy_boot_params`は2つのことを実行します:
 
-1. Copies `hdr` from [header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L281) to the `boot_params` structure in `setup_header` field
+1. `hdr`を[header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L281)から`setup_header`フィールド内の`boot_params`構造体へコピー
 
-2. Updates pointer to the kernel command line if the kernel was loaded with the old command line protocol.
+2. カーネルが古いコマンドラインプロトコルでロードされた場合に、ポインタをカーネルのコマンドラインに更新
 
-Note that it copies `hdr` with `memcpy` function which is defined in the [copy.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/copy.S) source file. Let's have a look inside:
+`hdr`を、[copy.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/copy.S)で定義されている`memcpy`関数と一緒にコピーしていることに注目してください。中身を見てみましょう:
 
 ```assembly
 GLOBAL(memcpy)
@@ -226,40 +227,47 @@ GLOBAL(memcpy)
 ENDPROC(memcpy)
 ```
 
-Yeah, we just moved to C code and now assembly again :) First of all we can see that `memcpy` and other routines which are defined here, start and end with the two macros: `GLOBAL` and `ENDPROC`. `GLOBAL` is described in [arch/x86/include/asm/linkage.h](https://github.com/torvalds/linux/blob/master/arch/x86/include/asm/linkage.h) which defines `globl` directive and the label for it. `ENDPROC` is described in [include/linux/linkage.h](https://github.com/torvalds/linux/blob/master/include/linux/linkage.h) which marks the `name` symbol as a function name and ends with the size of the `name` symbol.
+わたしたちは、Cのコードに移ってきたばかりですが、またアセンブリをみます。:) まず初めに、`memcpy`とここで定義されている他のルーティンが2つのマクロで挟まれており、`GLOBAL`で始まって`ENDPROC`で終わっているのに気づきます。`GLOBAL`は、`globl`のディレクティブとそのためのラベルを定義する[arch/x86/include/asm/linkage.h](https://github.com/torvalds/linux/blob/master/arch/x86/include/asm/linkage.h)に記述されています。
+`ENDPROC`は、`name`シンボルを関数名としてマークアップし`name`シンボルのサイズで終わる[include/linux/linkage.h](https://github.com/torvalds/linux/blob/master/include/linux/linkage.h)に記述されています。
 
-Implementation of `memcpy` is easy. At first, it pushes values from the `si` and `di` registers to the stack to preserve their values because they will change during the `memcpy`. `memcpy` (and other functions in copy.S) use `fastcall` calling conventions. So it gets its incoming parameters from the `ax`, `dx` and `cx` registers.  Calling `memcpy` looks like this:
+`memcpy`の実装は簡単です。まず、`si`と`di`レジスタの値をスタックにプッシュします。これらの値は`memcpy`の実行中に変化するので、スタックにプッシュして値を保存すします。`memcpy`（に加え、[copy.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/copy.S)内の他の関数）は`fastcall`呼び出しのため、パラメータを`ax`、`dx`そして`cx`レジスタから取得します。
+`memcpy`の呼び出しは次のように表示されます:
 
 ```c
 memcpy(&boot_params.hdr, &hdr, sizeof hdr);
 ```
 
-So,
-* `ax` will contain the address of the `boot_params.hdr`
-* `dx` will contain the address of `hdr`
-* `cx` will contain the size of `hdr` in bytes.
+したがって、
+* `ax`は、`boot_params.hdr`のアドレスを持ち、
+* `dx`は、`hdr`のアドレスを持ち、
+* `cx`は、`hdr`のサイズの数値を持ちます。
 
-`memcpy` puts the address of `boot_params.hdr` into `di` and saves the size on the stack. After this it shifts to the right on 2 size (or divide on 4) and copies from `si` to `di` by 4 bytes. After this we restore the size of `hdr` again, align it by 4 bytes and copy the rest of the bytes from `si` to `di` byte by byte (if there is more). Restore `si` and `di` values from the stack in the end and after this copying is finished.
+`memcpy`は`boot_params.hdr`のアドレスを`di`に入れ、スタックにサイズを保存します。
+この後、2サイズ右にシフト（あるいは4で除算）し、`si`から`di`に4バイト毎にコピーします。
+この後さらに、`hdr`のサイズをリストアし、4バイトでアドレスをそろえ、残りのバイト（もしあれば）を`si`から`di`に1バイト毎にコピーします。
+最後に`si`と`di`の値をスタックからリストアすると、コピーは完了です。
 
 コンソールの初期化
 --------------------------------------------------------------------------------
 
-After `hdr` is copied into `boot_params.hdr`, the next step is console initialization by calling the `console_init` function which is defined in [arch/x86/boot/early_serial_console.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/early_serial_console.c).
+`hdr`を`boot_params.hdr`にコピーしたら、次のステップは、
+[arch/x86/boot/early_serial_console.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/early_serial_console.c)に定義されている`console_init`関数を呼び、コンソールを初期化することです。
 
-It tries to find the `earlyprintk` option in the command line and if the search was successful, it parses the port address and baud rate of the serial port and initializes the serial port. Value of `earlyprintk` command line option can be one of these:
+その関数は、`earlyprintk`オプションをコマンドラインから探し、もしあれば、ポートアドレスとシリアルポートのボーレートを解析し、シリアルポートを初期化します。`earlyprintk`コマンドラインオプションの値は、次のうちのいずれかです:
 
 * serial,0x3f8,115200
 * serial,ttyS0,115200
 * ttyS0,115200
 
-After serial port initialization we can see the first output:
+シリアルポート初期化の後、最初の出力を見れます:
 
 ```C
 if (cmdline_find_option_bool("debug"))
     puts("early console in setup code\n");
 ```
 
-The definition of `puts` is in [tty.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/tty.c). As we can see it prints character by character in a loop by calling the `putchar` function. Let's look into the `putchar` implementation:
+`puts`は[tty.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/tty.c)で定義されています。
+見てのとおり、それはputchar関数を呼び出すことで、1文字1文字をループで表示します。putcharの実装を見てみましょう:
 
 ```C
 void __attribute__((section(".inittext"))) putchar(int ch)
@@ -274,9 +282,11 @@ void __attribute__((section(".inittext"))) putchar(int ch)
 }
 ```
 
-`__attribute__((section(".inittext")))` means that this code will be in the `.inittext` section. We can find it in the linker file [setup.ld](https://github.com/torvalds/linux/blob/master/arch/x86/boot/setup.ld#L19).
+`__attribute__((section(".inittext")))`は、このコードが`.inittext`セクションにあることを意味しています。
+このセクションは、リンカファイル[setup.ld](https://github.com/torvalds/linux/blob/master/arch/x86/boot/setup.ld#L19)内にあります。
 
-First of all, `putchar` checks for the `\n` symbol and if it is found, prints `\r` before. After that it outputs the character on the VGA screen by calling the BIOS with the `0x10` interrupt call:
+まず最初に、`putchar`は`\n`シンボルをチェックし、それが見つかれば`\r`を先に表示します。
+その後、`0x10`の割り込みでBIOSを呼び出し、VGAスクリーンに文字を表示させます:
 
 ```C
 static void __attribute__((section(".inittext"))) bios_putchar(int ch)
@@ -292,7 +302,7 @@ static void __attribute__((section(".inittext"))) bios_putchar(int ch)
 }
 ```
 
-Here `initregs` takes the `biosregs` structure and first fills `biosregs` with zeros using the `memset` function and then fills it with register values.
+ここで、`initregs`は`biosregs`構造体を扱います。最初に`memset`関数を使って`biosregs`をゼロで埋め、それからレジスタの値を入力します。
 
 ```C
     memset(reg, 0, sizeof *reg);
@@ -303,7 +313,7 @@ Here `initregs` takes the `biosregs` structure and first fills `biosregs` with z
     reg->gs = gs();
 ```
 
-Let's look at the [memset](https://github.com/torvalds/linux/blob/master/arch/x86/boot/copy.S#L36) implementation:
+[memset](https://github.com/torvalds/linux/blob/master/arch/x86/boot/copy.S#L36)の実装を見ていきましょう:
 
 ```assembly
 GLOBAL(memset)
@@ -322,15 +332,21 @@ GLOBAL(memset)
 ENDPROC(memset)
 ```
 
-As you can read above, it uses the `fastcall` calling conventions like the `memcpy` function, which means that the function gets parameters from `ax`, `dx` and `cx` registers.
+上から読み取れる通り、`memcpy`関数のように、関数呼び出しに`fastcall`呼び出し規約を使っています。
+つまり、関数は`ax`、`dx`そして`cx`レジスタから引数を取得しています。
 
-Generally `memset` is like a memcpy implementation. It saves the value of the `di` register on the stack and puts the `ax` value into `di` which is the address of the `biosregs` structure. Next is the `movzbl` instruction, which copies the `dl` value to the low 2 bytes of the `eax` register. The remaining 2 high bytes  of `eax` will be filled with zeros.
+概して`memset`は、`memcpy`の実装に似ています。`di`レジスタの値をスタックに保存し、`ax`レジスタの値をbiosregs構造体のアドレスであるdiに置きます。
+次に`movzbl`命令が、`dl`レジスタの値を`eax`レジスタの下位2バイトにコピーします。残りの`eax`の上位2バイトにはゼロが入力されます。
 
-The next instruction multiplies `eax` with `0x01010101`. It needs to because `memset` will copy 4 bytes at the same time. For example, we need to fill a structure with `0x7` with memset. `eax` will contain `0x00000007` value in this case. So if we multiply `eax` with `0x01010101`, we will get `0x07070707` and now we can copy these 4 bytes into the structure. `memset` uses `rep; stosl` instructions for copying `eax` into `es:di`.
+次の命令は`eax`に`0x01010101`をかけます。`memset`が4バイトを同時にコピーできるようにするためです。
+例えば、`memset`を使って構造体を`0x7`で埋めたいとします。その場合、`eax`は`0x00000007`を持ちます。
+ここでeaxに`0x01010101`をかけると`0x07070707`になり、4バイトを構造体にコピーできるのです。
+`memset`は、eaxを`es:di`にコピーする際、`rep; stosl`命令を使います。
 
-The rest of the `memset` function does almost the same as `memcpy`.
+`memset`関数が他に行うことは、`memcpy`とほぼ同じです。
 
-After the `biosregs` structure is filled with `memset`, `bios_putchar` calls the [0x10](http://www.ctyme.com/intr/rb-0106.htm) interrupt which prints a character. Afterwards it checks if the serial port was initialized or not and writes a character there with [serial_putchar](https://github.com/torvalds/linux/blob/master/arch/x86/boot/tty.c#L30) and `inb/outb` instructions if it was set.
+`biosregs`構造体が`memset`により埋められると、`bios_putchar`は、[0x10](http://www.ctyme.com/intr/rb-0106.htm)割り込みを呼び出し、文字を表示します。
+次に、シリアルポートが初期化されたかどうかをチェックし、初期化済みであれば、[serial_putchar](https://github.com/torvalds/linux/blob/master/arch/x86/boot/tty.c#L30)と、`inb/outb`命令で文字を書き出します。
 
 ヒープの初期化
 --------------------------------------------------------------------------------
@@ -357,7 +373,7 @@ which means `heap_end_ptr` or `_end` + `512`(`0x200h`). The last check is whethe
 
 Now the heap is initialized and we can use it using the `GET_HEAP` method. We will see how it is used, how to use it and how the it is implemented in the next posts.
 
-CPU検証
+CPUのバリデーション
 --------------------------------------------------------------------------------
 
 The next step as we can see is cpu validation by `validate_cpu` from [arch/x86/boot/cpu.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/cpu.c).
