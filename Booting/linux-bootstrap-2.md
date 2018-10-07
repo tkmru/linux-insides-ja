@@ -351,9 +351,9 @@ ENDPROC(memset)
 ヒープの初期化
 --------------------------------------------------------------------------------
 
-After the stack and bss section were prepared in [header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S) (see previous [part](linux-bootstrap-1.md)), the kernel needs to initialize the [heap](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L116) with the [`init_heap`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L116) function.
+スタックとbssセクションが[header.S](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S)（前の[章](linux-bootstrap-1.md)参照）に準備できたら、カーネルは[`init_heap`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L116)関数を使って[ヒープ](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L116)を初期化する必要があります。
 
-First of all `init_heap` checks the [`CAN_USE_HEAP`](https://github.com/torvalds/linux/blob/master/arch/x86/include/uapi/asm/bootparam.h#L21) flag from the [`loadflags`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L321) in the kernel setup header and calculates the end of the stack if this flag was set:
+まず`init_heap`はカーネルセットアップヘッダにある[`loadflags`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/header.S#L321) から[`CAN_USE_HEAP`](https://github.com/torvalds/linux/blob/master/arch/x86/include/uapi/asm/bootparam.h#L21)フラグをチェックし、フラグがセットされている場合はスタックの終わりを計算します:
 
 ```C
     char *stack_end;
@@ -363,22 +363,25 @@ First of all `init_heap` checks the [`CAN_USE_HEAP`](https://github.com/torvalds
             : "=r" (stack_end) : "i" (-STACK_SIZE));
 ```
 
-or in other words `stack_end = esp - STACK_SIZE`.
+言い換えると、`stack_end = esp - STACK_SIZE` という計算を行います。
 
-Then there is the `heap_end` calculation:
+`heap_end`の計算は以下のようになります:
+
 ```c
     heap_end = (char *)((size_t)boot_params.hdr.heap_end_ptr + 0x200);
 ```
-which means `heap_end_ptr` or `_end` + `512`(`0x200h`). The last check is whether `heap_end` is greater than `stack_end`. If it is then `stack_end` is assigned to `heap_end` to make them equal.
 
-Now the heap is initialized and we can use it using the `GET_HEAP` method. We will see how it is used, how to use it and how the it is implemented in the next posts.
+これは、`heap_end_ptr`または、`_end + 512`(`0x200h`)を意味します。最後に`heap_end`は`stack_end`より大きいかどうかがチェックされます。それが正の場合は、それらをイコールにするため、`stack_end`が`heap_end`に適用されます。
+
+これでヒープは初期化され、`GET_HEAP`メソッドを用いてこれを使うことができるようになりました。実際の使われ方、使い方、実装は次の章で見ていきましょう。
 
 CPUのバリデーション
 --------------------------------------------------------------------------------
 
-The next step as we can see is cpu validation by `validate_cpu` from [arch/x86/boot/cpu.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/cpu.c).
+次のステップは、[arch/x86/boot/cpu.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/cpu.c)に書かれた`validate_cpu`によるCPUのバリデーションです。
 
-It calls the [`check_cpu`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/cpucheck.c#L102) function and passes cpu level and required cpu level to it and checks that the kernel launches on the right cpu level.
+これは[`check_cpu`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/cpucheck.c#L102)関数を呼び出し、現在のCPUレベルと必須とされているCPUレベルを渡してカーネルが正しいCPUレベルで起動していることをチェ確認します。
+
 ```c
 check_cpu(&cpu_level, &req_level, &err_flags);
 if (cpu_level < req_level) {
@@ -387,14 +390,14 @@ if (cpu_level < req_level) {
 }
 ```
 
-`check_cpu` checks the cpu's flags, presence of [long mode](http://en.wikipedia.org/wiki/Long_mode) in case of x86_64(64-bit) CPU, checks the processor's vendor and makes preparation for certain vendors like turning off SSE+SSE2 for AMD if they are missing, etc.
+`check_cpu`はCPUのフラグを確認します。x86_64（64-bit）CPUの場合は[long mode](http://en.wikipedia.org/wiki/Long_mode)の存在を確認します。また、CPUベンダーを確認し、AMDのようなSSE+SSE2がないCPUの場合、その機能をオフにします。
 
 メモリ検知
 --------------------------------------------------------------------------------
 
-The next step is memory detection by the `detect_memory` function. `detect_memory` basically provides a map of available RAM to the cpu. It uses different programming interfaces for memory detection like `0xe820`, `0xe801` and `0x88`. We will see only the implementation of **0xE820** here.
+次のステップは`detect_memory`関数によるメモリ検知です。`detect_memory`は使用可能なRAMのマップをCPUに提供します。メモリ検知には`0xe820`、`0xe801`そして`0x8`8などのいくつかの異なるプログラミングインターフェースを使います。ここでは **0xE820** の実装だけを見ていきましょう。
 
-Let's look into the `detect_memory_e820` implementation from the [arch/x86/boot/memory.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/memory.c) source file. First of all, the `detect_memory_e820` function initializes the `biosregs` structure as we saw above and fills registers with special values for the `0xe820` call:
+[arch/x86/boot/memory.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/memory.c) ソースファイルから`detect_memory_e820`の実装を見ましょう。まず先述のように`detect_memory_e820`関数は`biosregs`構造体を初期化し、レジスタに`0xe820`呼び出しのための特別な値を入力します:
 
 ```assembly
     initregs(&ireg);
@@ -404,26 +407,26 @@ Let's look into the `detect_memory_e820` implementation from the [arch/x86/boot/
     ireg.di  = (size_t)&buf;
 ```
 
-* `ax` contains the number of the function (0xe820 in our case)
-* `cx` register contains size of the buffer which will contain data about memory
-* `edx` must contain the `SMAP` magic number
-* `es:di` must contain the address of the buffer which will contain memory data
-* `ebx` has to be zero.
+* `ax` は関数のアドレスを内包します (ここでは0xe820)
+* `cx` レジスタは、メモリに関するデータを格納するバッファのサイズを持ちます。
+* `edx` は `SMAP` マジックナンバーを持っている必要があります。
+* `es:di` はメモリデータを含むバッファのアドレスを内包する必要があります。
+* `ebx` は0を持っている必要がある.
 
-Next is a loop where data about the memory will be collected. It starts from the call of the `0x15` BIOS interrupt, which writes one line from the address allocation table. For getting the next line we need to call this interrupt again (which we do in the loop). Before the next call `ebx` must contain the value returned previously:
+次に、メモリに関するデータを収集するループです。`0x15` BIOS割り込みの呼び出しで始まり、address allocation tableから1行を書き出します。次の行を取得するには、この割り込みを再度呼び出す必要があります（ループ内で行います）。次の呼び出しの前に`ebx`は前に返り値を持たねばなりません:
 
 ```C
     intcall(0x15, &ireg, &oreg);
     ireg.ebx = oreg.ebx;
 ```
 
-Ultimately, it does iterations in the loop to collect data from the address allocation table and writes this data into the `e820entry` array:
+最終的ににebxはループ内で反復し、address allocation table からデータを集め、データを以下のように`e820entry`配列に書き込みます:
 
-* start of memory segment
-* size  of memory segment
-* type of memory segment (which can be reserved, usable and etc...).
+* メモリセグメントの開始アドレス
+* メモリセグメントのサイズ
+* メモリセグメントのタイプ (予約済み、使用不可能 etc...).
 
-You can see the result of this in the `dmesg` output, something like:
+この結果は以下のような`dmesg`の出力によって確認できます:
 
 ```
 [    0.000000] e820: BIOS-provided physical RAM map:
@@ -438,14 +441,18 @@ You can see the result of this in the `dmesg` output, something like:
 キーボードの初期化
 --------------------------------------------------------------------------------
 
-The next step is the initialization of the keyboard with the call of the [`keyboard_init()`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L65) function. At first `keyboard_init` initializes registers using the `initregs` function and calling the [0x16](http://www.ctyme.com/intr/rb-1756.htm) interrupt for getting the keyboard status.
+次のステップは[`keyboard_init()`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/main.c#L65)関数の呼び出しによるキーボードの初期化です。
+`keyboard_init`は、まず`initregs`関数を使いレジスタを初期化し、[0x16](http://www.ctyme.com/intr/rb-1756.htm)割り込みを呼び出して、キーボードのステータスを取得します。。
+
 ```c
     initregs(&ireg);
     ireg.ah = 0x02;     /* Get keyboard status */
     intcall(0x16, &ireg, &oreg);
     boot_params.kbd_status = oreg.al;
 ```
-After this it calls [0x16](http://www.ctyme.com/intr/rb-1757.htm) again to set repeat rate and delay.
+
+この処理が終わった後、[0x16](http://www.ctyme.com/intr/rb-1757.htm)を再度呼び出しリピート率と遅延時間を設定します。
+
 ```c
     ireg.ax = 0x0305;   /* Set keyboard repeat rate */
     intcall(0x16, &ireg, NULL);
@@ -454,9 +461,10 @@ After this it calls [0x16](http://www.ctyme.com/intr/rb-1757.htm) again to set r
 クエリ
 --------------------------------------------------------------------------------
 
-The next couple of steps are queries for different parameters. We will not dive into details about these queries, but will get back to it in later parts. Let's take a short look at these functions:
+次の2ステップはいくつかのパラメータのためのクエリです。これらクエリについて今は詳細に追いませんが、また後のパートで見ましょう。簡単にこれらの関数を見ていきましょう:
 
-The [query_mca](https://github.com/torvalds/linux/blob/master/arch/x86/boot/mca.c#L18) routine calls the [0x15](http://www.ctyme.com/intr/rb-1594.htm) BIOS interrupt to get the machine model number, sub-model number, BIOS revision level, and other hardware-specific attributes:
+[query_mca](https://github.com/torvalds/linux/blob/master/arch/x86/boot/mca.c#L18)ルーティンは、
+[0x15](http://www.ctyme.com/intr/rb-1594.htm)BIOS割り込みを呼び出し、マシンモデルナンバー、サブモデルナンバー、BIOSアップデートレベル、その他のハードウェアの属性を取得します:
 
 ```c
 int query_mca(void)
@@ -482,7 +490,7 @@ int query_mca(void)
 }
 ```
 
-It fills  the `ah` register with `0xc0` and calls the `0x15` BIOS interruption. After the interrupt execution it checks  the [carry flag](http://en.wikipedia.org/wiki/Carry_flag) and if it is set to 1, the BIOS doesn't support [**MCA**](https://en.wikipedia.org/wiki/Micro_Channel_architecture). If carry flag is set to 0, `ES:BX` will contain a pointer to the system information table, which looks like this:
+これは`ah`レジスタに`0xc0`を入れ、`0x15`BIOS割り込みを呼び出します。割り込みが実行された後、[carry flag](http://en.wikipedia.org/wiki/Carry_flag)をチェックし、1のときはBIOSは[**MCA**](https://en.wikipedia.org/wiki/Micro_Channel_architecture)をサポートしません。キャリーフラグが0の場合は、`ES:BX`はシステム情報テーブルへのポインタを指します。詳細は次のとおりです:
 
 ```
 Offset  Size    Description
@@ -511,7 +519,7 @@ Offset  Size    Description
  13h  3 BYTEs   "JPN"
  ```
 
-Next we call the `set_fs` routine and pass the value of the `es` register to it. The implementation of `set_fs` is pretty simple:
+次に、`set_fs`ルーティンを呼び出し、`es`レジスタの値をそこに渡します。`set_fs`の実装は非常にシンプルです:
 
 ```c
 static inline void set_fs(u16 seg)
@@ -520,17 +528,18 @@ static inline void set_fs(u16 seg)
 }
 ```
 
-This function contains inline assembly which gets the value of the `seg` parameter and puts it into the `fs` register. There are many functions in [boot.h](https://github.com/torvalds/linux/blob/master/arch/x86/boot/boot.h) like `set_fs`, for example `set_gs`, `fs`, `gs` for reading a value in it etc...
+この関数はインラインアセンブリを内包しており、`seg`パラメータを取得してそれを`fs`レジスタに置きます。
+[boot.h](https://github.com/torvalds/linux/blob/master/arch/x86/boot/boot.h) には、`set_gs`、`fs`、`gs`といったたくさんの関数があります。
 
-At the end of `query_mca` it just copies the table pointed to by `es:bx` to the `boot_params.sys_desc_table`.
+`query_mca`の終わりでは、`es:bx`によって指されてたテーブルを`boot_params.sys_desc_table`にコピーするだけです。
 
-The next step is getting [Intel SpeedStep](http://en.wikipedia.org/wiki/SpeedStep) information by calling the `query_ist` function. First of all it checks the CPU level and if it is correct, calls `0x15` for getting info and saves the result to `boot_params`.
+次のステップは、`query_ist`関数を呼び出し、[Intel SpeedStep](http://en.wikipedia.org/wiki/SpeedStep)の情報を取得することです。まずCPUレベルをチェックし、それが正しければ`0x15`を呼び出して情報を取得し、その結果を`boot_params`に保存します。
 
-The following [query_apm_bios](https://github.com/torvalds/linux/blob/master/arch/x86/boot/apm.c#L21) function gets [Advanced Power Management](http://en.wikipedia.org/wiki/Advanced_Power_Management) information from the BIOS. `query_apm_bios` calls the `0x15` BIOS interruption too, but with `ah` = `0x53` to check `APM` installation. After the `0x15` execution, `query_apm_bios` functions check the `PM` signature (it must be `0x504d`), carry flag (it must be 0 if `APM` supported) and value of the `cx` register (if it's 0x02, プロテクトモード interface is supported).
+下記の[query_apm_bios](https://github.com/torvalds/linux/blob/master/arch/x86/boot/apm.c#L21)関数は[Advanced Power Management](http://en.wikipedia.org/wiki/Advanced_Power_Management)情報をBIOSから取得します。`query_apm_bios`は`0x15`のBIOS割り込みも呼び出しますが、`APM`のインストールをチェックするため`ah`=`0x53`を使います。`0x15`実行後、`query_apm_bios`関数はPMの署名（`0x504d`であること）、キャリーフラグ（`APM`がサポートしている場合は0）と`cx`レジスタ（0x02の場合、プロテクトモードがサポートされていること）をチェックします。
 
-Next it calls `0x15` again, but with `ax = 0x5304` for disconnecting the `APM` interface and connecting the 32-bit プロテクトモード interface. In the end it fills `boot_params.apm_bios_info` with values obtained from the BIOS.
+次に再度`0x15`を呼び出しますが、`APM`インターフェースとの接続を切り、32bit プロテクトモードに接続するため、`ax=0x5304`を使います。最後にBIOSから得た値を`boot_params.apm_bios_info`に入力します。
 
-Note that `query_apm_bios` will be executed only if `CONFIG_APM` or `CONFIG_APM_MODULE` was set in the configuration file:
+`query_apm_bios`は、`CONFIG_APM`か`CONFIG_APM_MODULE`が設定ファイルで有効になっている場合のみ実行されることに注意してください:
 
 ```C
 #if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
@@ -538,11 +547,11 @@ Note that `query_apm_bios` will be executed only if `CONFIG_APM` or `CONFIG_APM_
 #endif
 ```
 
-The last is the [`query_edd`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/edd.c#L122) function, which queries `Enhanced Disk Drive` information from the BIOS. Let's look into the `query_edd` implementation.
+最後の[`query_edd`](https://github.com/torvalds/linux/blob/master/arch/x86/boot/edd.c#L122)関数は、`Enhanced Disk Drive`情報をBIOSから問い合わせます。`query_edd`の実装を見てみましょう。
 
-First of all it reads the [edd](https://github.com/torvalds/linux/blob/master/Documentation/kernel-parameters.txt#L1023) option from the kernel's command line and if it was set to `off` then `query_edd` just returns.
+まず[edd](https://github.com/torvalds/linux/blob/master/Documentation/kernel-parameters.txt#L1023)オプションをカーネルコマンドラインから読み取り、`off`に設定されている場合は`query_edd`の値をそのまま返します。
 
-If EDD is enabled, `query_edd` goes over BIOS-supported hard disks and queries EDD information in the following loop:
+EDDが有効になっている場合は、`query_edd`はBIOSがサポートしているハードディスクに行き、次のようなループでEDD情報を問い合わせます:
 
 ```C
 for (devno = 0x80; devno < 0x80+EDD_MBR_SIG_MAX; devno++) {
@@ -556,7 +565,10 @@ for (devno = 0x80; devno < 0x80+EDD_MBR_SIG_MAX; devno++) {
     }
 ```
 
-where `0x80` is the first hard drive and the value of `EDD_MBR_SIG_MAX` macro is 16. It collects data into the array of [edd_info](https://github.com/torvalds/linux/blob/master/include/uapi/linux/edd.h#L172) structures. `get_edd_info` checks that EDD is present by invoking the `0x13` interrupt with `ah` as `0x41` and if EDD is present, `get_edd_info` again calls the `0x13` interrupt, but with `ah` as `0x48` and `si` containing the address of the buffer where EDD information will be stored.
+`0x80`があるのは最初のハードドライブで、`EDD_MBR_SIG_MAX`マクロの値は16です。
+これはデータを[edd_info](https://github.com/torvalds/linux/blob/master/include/uapi/linux/edd.h#L172)構造体の配列に集めます。
+`get_edd_info`はEDDが存在しているかどうかを、`ah`に`0x41`を入れ、`0x13`割り込みを呼び出し確かめ、
+もし存在していれば`get_edd_info`が再び`0x13`割り込みを呼び出します。
 
 まとめ
 --------------------------------------------------------------------------------
